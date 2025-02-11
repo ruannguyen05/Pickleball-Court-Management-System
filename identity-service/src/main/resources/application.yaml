@@ -1,0 +1,30 @@
+DEFAULT:
+  JWT_KEY: "1TjXchw5FloESb63Kc+DFhTARvpWL4jUGCwfGWxuG5SIf/1y/LgJxHnMqaF6A/ij"
+
+server:
+  port: 8080
+  servlet:
+    context-path: /identity
+spring:
+  data:
+    redis:
+      host: 203.145.46.242
+      port: 6379
+      password: Pickleball@123
+  datasource:
+    url: jdbc:mysql://203.145.46.242:3306/pickleball?useSSL=false&serverTimezone=UTC
+    username: root
+    password: Pickleball@123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+jwt:
+  signerKey: ${JWT_KEY:${DEFAULT.JWT_KEY}}
+  valid-duration: 3600 # in second
+  refreshable-duration: 3600 # in seconds
