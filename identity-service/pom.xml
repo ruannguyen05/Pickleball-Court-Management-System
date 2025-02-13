@@ -150,7 +150,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>vn.hyperlogy.payment.identityservice.IdentityServiceApplication</mainClass>
+                    <mainClass>vn.pickleball.identityservice.IdentityServiceApplication</mainClass>
                     <layout>JAR</layout>
                 </configuration>
                 <executions>
