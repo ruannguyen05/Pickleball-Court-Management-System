@@ -1,0 +1,11 @@
+package vn.pickleball.courtservice.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import vn.pickleball.courtservice.entity.Court;
+import vn.pickleball.courtservice.entity.CourtSlot;
+
+import java.util.List;
+
+public interface CourtSlotRepository extends JpaRepository<CourtSlot, String> {
+    List<CourtSlot> findByCourtId(String courtId);
+}
