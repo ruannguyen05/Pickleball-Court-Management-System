@@ -5,12 +5,12 @@ import org.mapstruct.factory.Mappers;
 import vn.pickleball.identityservice.dto.request.TransactionRequest;
 import vn.pickleball.identityservice.entity.Transaction;
 
-@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE, nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
 public interface TransactionMapper {
 
     TransactionMapper INSTANCE = Mappers.getMapper(TransactionMapper.class);
 
-    @Mapping(source = "orderId", target = "order.id")
+    @Mapping(target = "order", ignore = true)
     Transaction toEntity(TransactionRequest request);
 
     @Mapping(source = "order.id", target = "orderId")

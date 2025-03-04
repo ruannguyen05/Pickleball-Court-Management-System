@@ -51,7 +51,7 @@ public class BookingSlotService {
         }
 
         // Lấy tất cả CourtSlot theo courtId
-        List<CourtSlot> courtSlots = courtSlotRepository.findByCourtId(courtId);
+        List<CourtSlot> courtSlots = courtSlotRepository.findByCourtIdOrderByCreatedAtAsc(courtId);
 
         // Lấy tất cả CourtPrice của courtId
         List<CourtPrice> courtPrices = courtPriceRepository.findByCourtId(courtId);
@@ -141,8 +141,12 @@ public class BookingSlotService {
             slotResponse.setRegularPrice(courtPrice.getRegularPrice()); // Giá từ CourtPrice
             slotResponse.setDailyPrice(courtPrice.getDailyPrice());
             slotResponse.setStudentPrice(courtPrice.getStudentPrice());
-            slotResponse.setStatus(BookingStatus.AVAILABLE); // Trạng thái mặc định
 
+            if (slotResponse.getEndTime().isBefore(LocalTime.now()) && !dateBooking.isAfter(LocalDate.now())) {
+                slotResponse.setStatus(BookingStatus.LOCKED);
+            }else {
+                slotResponse.setStatus(BookingStatus.AVAILABLE);
+            }
             splitSlots.add(slotResponse);
 
             // Cập nhật startTime cho vòng lặp tiếp theo
@@ -201,6 +205,8 @@ public class BookingSlotService {
             for (BookingSlotResponse slot : bookingSlots) {
                 if (startTimes.contains(slot.getStartTime())) {
                     slot.setStatus(status); // Cập nhật trạng thái thành BOOKED
+                }else if (slot.getEndTime().isBefore(LocalTime.now()) && !dateBooking.isAfter(LocalDate.now())) {
+                    slot.setStatus(BookingStatus.LOCKED);
                 }
             }
         }

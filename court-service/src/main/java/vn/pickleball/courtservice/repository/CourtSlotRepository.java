@@ -7,5 +7,6 @@ import vn.pickleball.courtservice.entity.CourtSlot;
 import java.util.List;
 
 public interface CourtSlotRepository extends JpaRepository<CourtSlot, String> {
+    List<CourtSlot> findByCourtIdOrderByCreatedAtAsc(String courtId);
     List<CourtSlot> findByCourtId(String courtId);
 }

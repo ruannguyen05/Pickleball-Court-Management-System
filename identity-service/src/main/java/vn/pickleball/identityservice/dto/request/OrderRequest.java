@@ -20,5 +20,6 @@ public class OrderRequest {
     private BigDecimal discountAmount;
     private BigDecimal paymentAmount;
     private BigDecimal amountPaid;
+    private String paymentStatus;
     private List<OrderDetailRequest> orderDetails;
 }

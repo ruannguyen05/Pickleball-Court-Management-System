@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.pickleball.identityservice.client.CourtClient;
 import vn.pickleball.identityservice.client.PaymentClient;
+import vn.pickleball.identityservice.dto.BookingStatus;
 import vn.pickleball.identityservice.dto.notification.NotificationResponse;
 import vn.pickleball.identityservice.dto.request.CreateQrRequest;
 import vn.pickleball.identityservice.dto.request.OrderRequest;
@@ -21,8 +22,10 @@ import vn.pickleball.identityservice.dto.response.OrderResponse;
 import vn.pickleball.identityservice.dto.response.PaymentData;
 import vn.pickleball.identityservice.entity.Order;
 import vn.pickleball.identityservice.entity.OrderDetail;
+import vn.pickleball.identityservice.entity.Transaction;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.OrderMapper;
+import vn.pickleball.identityservice.mapper.TransactionMapper;
 import vn.pickleball.identityservice.repository.OrderRepository;
 import vn.pickleball.identityservice.repository.TransactionRepository;
 import vn.pickleball.identityservice.utils.GenerateString;
@@ -52,6 +55,7 @@ public class OrderService {
     private final ObjectMapper redisObjectMapper;
     private final ExecutorService executorService;
     private final NotificationWebSocketHandler socketHandler;
+    private final TransactionMapper transactionMapper;
 
     private static final String TRANSACTION_KEY_PREFIX = "transaction:";
     private static final String PREFIX = "bookingslot:";
@@ -75,6 +79,7 @@ public class OrderService {
         order.setTotalAmount(request.getTotalAmount());
         order.setPaymentAmount(request.getPaymentAmount());
         order.setOrderType("Đơn ngày");
+        order.setPaymentStatus(request.getPaymentStatus());
 
         Double amount = request.getPaymentAmount().doubleValue();
         String billCode = GenerateString.generateRandomString(15);
@@ -133,7 +138,10 @@ public class OrderService {
                 order.setPaymentStatus("Chưa thanh toán");
                 orderRepository.save(order);
                 try {
-                    courtClient.updateBookingSlots(getBookingSlot(billCode));
+                    UpdateBookingSlot updateBookingSlot = getBookingSlot(billCode);
+                    updateBookingSlot.setStatus(BookingStatus.AVAILABLE);
+                    log.info("Update booking body : {}", updateBookingSlot);
+                    courtClient.updateBookingSlots(updateBookingSlot);
                 } catch (FeignException e) {
                     throw new ApiException("Failed to update booking slot", "API_UPDATE_BOOKING_SLOT_ERROR");
                 }
@@ -148,13 +156,24 @@ public class OrderService {
         TransactionRequest transactionRequest = getTransactionRedis(paymentData.getBillCode());
         Order order = orderRepository.findById(transactionRequest.getOrderId()).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
         order.setOrderStatus("Đặt lịch thành công");
-        order.setPaymentStatus(order.getPaymentStatus().equals("Đặt cọc") ? "Đã đặt cọc" : "Đã thanh toán");
+        String paymentStatus = order.getPaymentStatus().equals("Đặt cọc") ? "Đã đặt cọc" : "Đã thanh toán";
+        order.setPaymentStatus(paymentStatus);
         orderRepository.save(order);
         socketHandler.sendNotification(NotificationResponse.builder()
                         .key(order.getId())
                         .resDesc("Payment successfully")
                         .resCode("200")
                 .build());
+        Transaction transaction = Transaction.builder()
+                .order(order)
+                .amount(transactionRequest.getAmount())
+                .paymentStatus(paymentStatus)
+                .billCode(paymentData.getBillCode())
+                .ftCode(paymentData.getFtCode())
+                .createDate(LocalDateTime.now())
+                .status("Success")
+                .build();
+        transactionRepository.save(transaction);
         deleteTransactionRedis(paymentData.getBillCode());
     }
 
