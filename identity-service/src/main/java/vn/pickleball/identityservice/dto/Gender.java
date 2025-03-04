@@ -1,2 +1,6 @@
-package vn.pickleball.identityservice.dto;public enum Gender {
+package vn.pickleball.identityservice.dto;
+
+public enum Gender {
+    MALE,
+    FEMALE
 }

@@ -3,9 +3,12 @@ package vn.pickleball.identityservice.dto.request;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import vn.pickleball.identityservice.dto.Gender;
+import vn.pickleball.identityservice.dto.UserRank;
 import vn.pickleball.identityservice.validator.DobConstraint;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -22,10 +25,18 @@ public class UserCreationRequest {
     String firstName;
     String lastName;
 
+
     @DobConstraint(min = 10, message = "INVALID_DOB")
     LocalDate dob;
 
+    List<String> roles;
     String email;
 
     String phoneNumber;
+
+    boolean isStudent;
+
+    UserRank userRank;
+
+    Gender gender;
 }

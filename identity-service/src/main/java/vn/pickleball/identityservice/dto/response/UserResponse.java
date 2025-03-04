@@ -2,6 +2,8 @@ package vn.pickleball.identityservice.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import vn.pickleball.identityservice.dto.Gender;
+import vn.pickleball.identityservice.dto.UserRank;
 
 import java.time.LocalDate;
 import java.util.Set;
@@ -21,4 +23,10 @@ public class UserResponse {
     String email;
 
     String phoneNumber;
+
+    boolean isStudent;
+
+    UserRank userRank;
+
+    Gender gender;
 }

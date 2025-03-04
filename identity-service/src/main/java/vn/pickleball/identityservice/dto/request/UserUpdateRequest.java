@@ -2,6 +2,8 @@ package vn.pickleball.identityservice.dto.request;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import vn.pickleball.identityservice.dto.Gender;
+import vn.pickleball.identityservice.dto.UserRank;
 import vn.pickleball.identityservice.validator.DobConstraint;
 
 import java.time.LocalDate;
@@ -13,6 +15,9 @@ import java.util.List;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserUpdateRequest {
+    String id;
+    String username;
+
     String password;
     String firstName;
     String lastName;
@@ -25,4 +30,10 @@ public class UserUpdateRequest {
     String email;
 
     String phoneNumber;
+
+    boolean isStudent;
+
+    UserRank userRank;
+
+    Gender gender;
 }
