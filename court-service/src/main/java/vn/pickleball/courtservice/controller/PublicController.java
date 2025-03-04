@@ -62,7 +62,7 @@ public class PublicController {
     public ResponseEntity<Void> updateBookingSlots(
             @RequestBody UpdateBookingSlot updateBookingSlot
             ) {
-        bookingSlotService.updateBookingSlotsInRedis(updateBookingSlot.getCourtId(),updateBookingSlot.getDateBooking(),updateBookingSlot.getCourtSlotBookings());
+        bookingSlotService.updateBookingSlotsInRedis(updateBookingSlot.getCourtId(),updateBookingSlot.getDateBooking(), updateBookingSlot.getStatus(),updateBookingSlot.getCourtSlotBookings());
         return ResponseEntity.ok().build();
     }
 }

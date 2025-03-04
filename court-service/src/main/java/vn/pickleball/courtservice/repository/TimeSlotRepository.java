@@ -7,6 +7,7 @@ import vn.pickleball.courtservice.entity.TimeSlot;
 import java.util.List;
 
 public interface TimeSlotRepository extends JpaRepository<TimeSlot, String> {
-    List<TimeSlot> findByCourtId(String courtId);
+    List<TimeSlot> findByCourtIdOrderByStartTimeAsc(String courtId);
 
+    List<TimeSlot> findByCourtId(String courtId);
 }

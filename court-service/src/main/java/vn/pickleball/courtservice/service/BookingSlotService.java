@@ -73,7 +73,7 @@ public class BookingSlotService {
 
         for (CourtSlot courtSlot : courtSlots) {
             // Lấy tất cả TimeSlot của CourtSlot
-            List<TimeSlot> timeSlots = timeSlotRepository.findByCourtId(courtSlot.getCourt().getId());
+            List<TimeSlot> timeSlots = timeSlotRepository.findByCourtIdOrderByStartTimeAsc(courtSlot.getCourt().getId());
 
             // Tạo danh sách BookingSlotResponse cho từng CourtSlot
             List<BookingSlotResponse> bookingSlots = new ArrayList<>();
@@ -100,6 +100,7 @@ public class BookingSlotService {
             // Tạo CourtSlotBookingResponse
             CourtSlotBookingResponse courtSlotBookingResponse = new CourtSlotBookingResponse();
             courtSlotBookingResponse.setCourtSlotId(courtSlot.getId());
+            courtSlotBookingResponse.setCourtSlotName(courtSlot.getName());
             courtSlotBookingResponse.setBookingSlots(bookingSlots);
 
             // Thêm vào kết quả
@@ -172,7 +173,7 @@ public class BookingSlotService {
         return cachedSlots;
     }
 
-    public void updateBookingSlotsInRedis(String courtId, LocalDate dateBooking, Map<String, List<LocalTime>> courtSlotBookings) {
+    public void updateBookingSlotsInRedis(String courtId, LocalDate dateBooking, BookingStatus status, Map<String, List<LocalTime>> courtSlotBookings) {
         String redisKey = REDIS_KEY_PREFIX + courtId + ":" + dateBooking.toString();
 
         // Lấy dữ liệu từ Redis
@@ -186,20 +187,20 @@ public class BookingSlotService {
 
         // Duyệt qua từng courtSlotId và cập nhật trạng thái
         for (Map.Entry<String, List<LocalTime>> entry : courtSlotBookings.entrySet()) {
-            String courtSlotId = entry.getKey();
+            String courtSlotName = entry.getKey();
             List<LocalTime> startTimes = entry.getValue();
 
             // Tìm CourtSlotBookingResponse tương ứng với courtSlotId
             CourtSlotBookingResponse courtSlotBookingResponse = cachedSlots.stream()
-                    .filter(response -> response.getCourtSlotId().equals(courtSlotId))
+                    .filter(response -> response.getCourtSlotName().equals(courtSlotName))
                     .findFirst()
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy courtSlotId trong Redis: " + courtSlotId));
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy courtSlotName trong Redis: " + courtSlotName));
 
             // Cập nhật trạng thái của các khung giờ được đặt
             List<BookingSlotResponse> bookingSlots = courtSlotBookingResponse.getBookingSlots();
             for (BookingSlotResponse slot : bookingSlots) {
                 if (startTimes.contains(slot.getStartTime())) {
-                    slot.setStatus(BookingStatus.BOOKED); // Cập nhật trạng thái thành BOOKED
+                    slot.setStatus(status); // Cập nhật trạng thái thành BOOKED
                 }
             }
         }

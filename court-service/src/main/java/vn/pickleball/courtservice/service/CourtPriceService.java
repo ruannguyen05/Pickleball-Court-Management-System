@@ -144,7 +144,7 @@ public class CourtPriceService {
     }
 
     public CourtPriceResponse getCourtPriceByCourtId(String courtId) {
-        List<TimeSlot> timeSlots = timeSlotRepository.findByCourtId(courtId);
+        List<TimeSlot> timeSlots = timeSlotRepository.findByCourtIdOrderByStartTimeAsc(courtId);
 
         CourtPriceResponse response = new CourtPriceResponse();
         response.setCourtId(courtId);
