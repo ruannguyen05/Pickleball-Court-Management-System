@@ -12,6 +12,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 @Configuration
 public class BeanConfiguration {
@@ -34,6 +35,11 @@ public class BeanConfiguration {
     @Bean
     public ExecutorService executorService() {
         return Executors.newCachedThreadPool();
+    }
+
+    @Bean
+    public ScheduledExecutorService scheduledExecutorService() {
+        return Executors.newScheduledThreadPool(5); // Pool 5 thread để xử lý timeout
     }
 
 

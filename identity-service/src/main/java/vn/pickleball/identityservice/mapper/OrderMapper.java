@@ -2,6 +2,7 @@ package vn.pickleball.identityservice.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 import vn.pickleball.identityservice.dto.BookingStatus;
 import vn.pickleball.identityservice.dto.request.OrderDetailRequest;
 import vn.pickleball.identityservice.dto.request.OrderRequest;
@@ -43,6 +44,13 @@ public interface OrderMapper {
     @Mapping(target = "courtSlotBookings", expression = "java(mapCourtSlotBookings(orderRequest.getOrderDetails()))")
     UpdateBookingSlot toUpdateBookingSlot(OrderRequest orderRequest);
 
+//    @Mapping(target = "courtId", ignore = true)
+//    @Mapping(target = "dateBooking", ignore = true)
+//    @Mapping(target = "status", expression = "java(BookingStatus.BOOKED)")
+//    @Mapping(target = "courtSlotBookings", expression = "java(mapCourtSlotBookingsV2(order.getOrderDetails()))")
+//    UpdateBookingSlot orderToUpdateBookingSlot(Order order);
+
+
     default Map<String, List<LocalTime>> mapCourtSlotBookings(List<OrderDetailRequest> orderDetails) {
         if (orderDetails == null || orderDetails.isEmpty()) {
             return Collections.emptyMap();
@@ -57,6 +65,21 @@ public interface OrderMapper {
 
         return courtSlotBookings;
     }
+
+
+//    @Named("mapCourtSlotBookingsV2")
+//    default Map<String, List<LocalTime>> mapCourtSlotBookingsV2(List<OrderDetail> orderDetails) {
+//        if (orderDetails == null || orderDetails.isEmpty()) {
+//            return Collections.emptyMap();
+//        }
+//        Map<String, List<LocalTime>> courtSlotBookings = new HashMap<>();
+//        for (OrderDetail detail : orderDetails) {
+//            List<LocalTime> timeSlots = splitTimeSlots(detail.getStartTime(), detail.getEndTime());
+//            courtSlotBookings.put(detail.getCourtSlotName(), timeSlots);
+//        }
+//        return courtSlotBookings;
+//    }
+
 
     default List<LocalTime> splitTimeSlots(LocalTime startTime, LocalTime endTime) {
         List<LocalTime> slots = new ArrayList<>();

@@ -34,10 +34,12 @@ import vn.pickleball.identityservice.websockethandler.NotificationWebSocketHandl
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -53,7 +55,7 @@ public class OrderService {
     private final CourtClient courtClient;
     private final RedisTemplate<String, String> redisTemplate;
     private final ObjectMapper redisObjectMapper;
-    private final ExecutorService executorService;
+    private final ScheduledExecutorService scheduler;
     private final NotificationWebSocketHandler socketHandler;
     private final TransactionMapper transactionMapper;
 
@@ -71,8 +73,8 @@ public class OrderService {
 
     public OrderResponse createOrder(OrderRequest request) {
         Order order = orderMapper.toEntity(request);
-
         List<OrderDetail> orderDetails = orderMapper.toEntity(request.getOrderDetails());
+
         orderDetails.forEach(detail -> detail.setOrder(order));
         order.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
         order.setOrderDetails(orderDetails);
@@ -84,24 +86,26 @@ public class OrderService {
         Double amount = request.getPaymentAmount().doubleValue();
         String billCode = GenerateString.generateRandomString(15);
 
+        // Tạo QR thanh toán
         CreateQrRequest qrRequest = CreateQrRequest.builder()
                 .billCode(billCode)
                 .amount(amount)
-                .signature(encrypt(amount,billCode, checkSum))
+                .signature(encrypt(amount, billCode, checkSum))
                 .build();
-        MbQrCodeResponse qrCodeResponse;
+        saveBookingSlot(orderMapper.toUpdateBookingSlot(request), billCode);
+        log.info("send update booking status");
         try {
             courtClient.updateBookingSlots(orderMapper.toUpdateBookingSlot(request));
         } catch (FeignException e) {
             throw new ApiException("Failed to update booking slot", "API_UPDATE_BOOKING_SLOT_ERROR");
         }
+
+        MbQrCodeResponse qrCodeResponse;
         try {
             qrCodeResponse = paymentClient.createQr(qrRequest, apiKey, clientId);
         } catch (FeignException e) {
-                throw new ApiException("Failed to parse error response from API", "API_MB_CREATE_QR_PARSE_ERROR");
+            throw new ApiException("Failed to create QR", "API_MB_CREATE_QR_ERROR");
         }
-
-
 
         Order savedOrder = orderRepository.save(order);
 
@@ -111,45 +115,63 @@ public class OrderService {
                 .paymentStatus(savedOrder.getPaymentStatus())
                 .billCode(billCode)
                 .build();
+
         saveTransactionToRedis(transaction);
-        saveBookingSlot(orderMapper.toUpdateBookingSlot(request),billCode);
+
+
+        // Lên lịch kiểm tra sau 5 phút
+        schedulePaymentCheck(billCode);
 
         OrderResponse response = orderMapper.toResponse(savedOrder);
         response.setQrcode(qrCodeResponse.getQrCode());
-        executorService.submit(() -> waitForPaymentResponse(billCode));
         return response;
     }
 
-    // Chờ phản hồi trong 5 phút
-    private void waitForPaymentResponse(String billCode) {
-        try {
-            // Chờ tối đa 5 phút (300 giây)
-            Thread.sleep(300_000);
-            String key = TRANSACTION_KEY_PREFIX + billCode;
-            if( redisTemplate.hasKey(key)){
-                TransactionRequest transactionRequest = getTransactionRedis(billCode);
-                Order order = orderRepository.findById(transactionRequest.getOrderId()).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
-                socketHandler.sendNotification(NotificationResponse.builder()
-                        .key(order.getId())
-                        .resDesc("Not payment")
-                        .resCode("400")
-                        .build());
-                order.setOrderStatus("Hủy do quá giờ thanh toán");
-                order.setPaymentStatus("Chưa thanh toán");
-                orderRepository.save(order);
-                try {
-                    UpdateBookingSlot updateBookingSlot = getBookingSlot(billCode);
-                    updateBookingSlot.setStatus(BookingStatus.AVAILABLE);
-                    log.info("Update booking body : {}", updateBookingSlot);
-                    courtClient.updateBookingSlots(updateBookingSlot);
-                } catch (FeignException e) {
-                    throw new ApiException("Failed to update booking slot", "API_UPDATE_BOOKING_SLOT_ERROR");
-                }
-            }
+    /**
+     * Lên lịch kiểm tra thanh toán sau 5 phút
+     */
+    private void schedulePaymentCheck(String billCode) {
+        scheduler.schedule(() -> processPaymentTimeout(billCode), 5, TimeUnit.MINUTES);
+    }
 
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    /**
+     * Xử lý đơn hàng quá hạn thanh toán
+     */
+    private void processPaymentTimeout(String billCode) {
+        String key = TRANSACTION_KEY_PREFIX + billCode;
+        if (!redisTemplate.hasKey(key)) {
+            log.info("Payment received, no action needed for billCode: {}", billCode);
+            return;
         }
+
+        TransactionRequest transactionRequest = getTransactionRedis(billCode);
+
+        // Cập nhật trạng thái đơn hàng
+        Order order = orderRepository.findById(transactionRequest.getOrderId())
+                .orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
+        log.info("send websocket");
+        socketHandler.sendNotification(NotificationResponse.builder()
+                .key(order.getId())
+                .resDesc("Not payment")
+                .resCode("400")
+                .build());
+
+        order.setOrderStatus("Hủy do quá giờ thanh toán");
+        order.setPaymentStatus("Chưa thanh toán");
+        orderRepository.save(order);
+        log.info("Update order status");
+        // Cập nhật trạng thái sân
+        UpdateBookingSlot updateBookingSlot = getBookingSlot(billCode);
+        updateBookingSlot.setStatus(BookingStatus.AVAILABLE);
+        log.info("Update booking body: {}", updateBookingSlot);
+        try {
+            courtClient.updateBookingSlots(updateBookingSlot);
+        } catch (FeignException e) {
+            log.error("Failed to update booking slot", e);
+            throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+        }
+
+        log.info("Order {} has been cancelled due to payment timeout.", order.getId());
     }
 
     public void paymentNotification(PaymentData paymentData){
@@ -227,7 +249,7 @@ public class OrderService {
         try {
             String key = PREFIX + billCode;
             String value = redisObjectMapper.writeValueAsString(bookingSlot);
-            redisTemplate.opsForValue().set(key, value, 5, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, value, 6, TimeUnit.MINUTES);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to serialize booking slot", e);
         }
