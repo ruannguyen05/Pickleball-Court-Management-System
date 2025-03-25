@@ -29,10 +29,24 @@ public class UserController {
                 .build();
     }
 
+    @PostMapping("/registerForStudent")
+    String registerForStudent(@RequestBody @Valid UserCreationRequest request) {
+        return userService.registerStudent(request);
+    }
+
+
+
     @GetMapping
     ApiResponse<List<UserResponse>> getUsers() {
         return ApiResponse.<List<UserResponse>>builder()
                 .result(userService.getUsers())
+                .build();
+    }
+
+    @GetMapping("/getUsersWithRole")
+    ApiResponse<List<UserResponse>> getUsersWithRole(@RequestParam String role) {
+        return ApiResponse.<List<UserResponse>>builder()
+                .result(userService.getUsersByRole(role))
                 .build();
     }
 
@@ -67,6 +81,13 @@ public class UserController {
     ApiResponse<UserResponse> updateUserByAdmin( @RequestBody UserUpdateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUserByAdmin(request))
+                .build();
+    }
+
+    @PostMapping("/admin_create")
+    ApiResponse<UserResponse> createUserByAdmin(@RequestBody @Valid UserCreationRequest request) {
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.createUserByAdmin(request))
                 .build();
     }
 }

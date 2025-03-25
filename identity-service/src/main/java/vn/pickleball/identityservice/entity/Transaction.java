@@ -39,4 +39,6 @@ public class Transaction {
     private String ftCode;
 
     private LocalDateTime createDate;
+
+    private String courtId;
 }

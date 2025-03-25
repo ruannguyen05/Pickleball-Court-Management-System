@@ -24,7 +24,7 @@ public class UserResponse {
 
     String phoneNumber;
 
-    boolean isStudent;
+    boolean student;
 
     UserRank userRank;
 

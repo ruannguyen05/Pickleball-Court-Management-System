@@ -27,6 +27,13 @@ public class RoleController {
                 .build();
     }
 
+    @PutMapping
+    ApiResponse<RoleResponse> update(@RequestBody RoleRequest request) {
+        return ApiResponse.<RoleResponse>builder()
+                .result(roleService.updateRole(request))
+                .build();
+    }
+
     @GetMapping
     ApiResponse<List<RoleResponse>> getAll() {
         return ApiResponse.<List<RoleResponse>>builder()

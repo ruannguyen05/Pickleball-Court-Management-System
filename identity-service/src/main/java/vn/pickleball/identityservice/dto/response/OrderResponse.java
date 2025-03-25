@@ -11,9 +11,11 @@ import java.util.List;
 @Data
 public class OrderResponse {
     private String id;
+    private String courtId;
     private String courtName;
     private String address;
     private LocalDate bookingDate;
+    private String userId;
     private String customerName;
     private String phoneNumber;
     private String note;
@@ -25,7 +27,10 @@ public class OrderResponse {
     private BigDecimal discountAmount;
     private BigDecimal paymentAmount;
     private BigDecimal amountPaid;
+    private BigDecimal amountRefund;
     private LocalDateTime paymentTimeout;
     private List<OrderDetailRequest> orderDetails;
     private String qrcode;
+    private LocalDateTime createdAt;
+
 }

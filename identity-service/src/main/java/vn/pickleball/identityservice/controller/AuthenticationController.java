@@ -2,18 +2,20 @@ package vn.pickleball.identityservice.controller;
 
 
 import com.nimbusds.jose.JOSEException;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import vn.pickleball.identityservice.dto.request.*;
 import vn.pickleball.identityservice.dto.response.AuthenticationResponse;
 import vn.pickleball.identityservice.dto.response.IntrospectResponse;
+import vn.pickleball.identityservice.dto.response.UserResponse;
+import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.service.AuthenticationService;
+import vn.pickleball.identityservice.service.UserService;
 
+import java.io.IOException;
 import java.text.ParseException;
 
 @RestController
@@ -22,6 +24,8 @@ import java.text.ParseException;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationController {
     AuthenticationService authenticationService;
+
+    UserService userService;
 
     @PostMapping("/token")
     ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request) {
@@ -52,8 +56,30 @@ public class AuthenticationController {
     @PostMapping("/logout")
     ApiResponse<Void> logout(@RequestBody LogoutRequest request) throws ParseException, JOSEException {
         authenticationService.logout(request);
+
+
         return ApiResponse.<Void>builder()
                 .message("Logout success")
                 .build();
+
+
     }
+
+    @GetMapping("/confirm_student")
+    ApiResponse<UserResponse> confirmStudent(@RequestParam String key , HttpServletResponse response) {
+        try {
+            response.sendRedirect("https://www.youtube.com/"); // Redirect sau khi xác nhận
+        } catch (IOException e) {
+            throw new ApiException("Redirect failed", "SERVER_ERROR");
+        }
+        return ApiResponse.<UserResponse>builder()
+                .result(userService.confirmRegisterStudent(key))
+                .build();
+    }
+
+    @PostMapping("/forgetPassword")
+    public void forgetPass(@RequestBody ForgotPasswordRequest request){
+        userService.forgetPass(request.getKey());
+    }
+
 }

@@ -1,4 +1,4 @@
-package vn.pickleball.identityservice.dto.request;
+package vn.pickleball.identityservice.dto.payment;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -1,5 +1,6 @@
 package vn.pickleball.identityservice.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
@@ -40,7 +41,7 @@ public class User extends BaseEntity{
     private String phoneNumber;
 
     @Column(name = "is_student")
-    private boolean isStudent;
+    private boolean student;
 
     @Column(name = "gender")
     @Enumerated(EnumType.STRING)
@@ -53,7 +54,12 @@ public class User extends BaseEntity{
     @ManyToMany
     Set<Role> roles;
 
-    @OneToMany(mappedBy = "user")
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<Order> orders;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonManagedReference
+    @JsonIgnore
+    private List<Notification> notifications;
 }

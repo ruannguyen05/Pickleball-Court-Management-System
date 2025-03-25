@@ -1,6 +1,7 @@
 package vn.pickleball.identityservice.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -54,6 +55,8 @@ public class Order extends BaseEntity{
     @Column
     private BigDecimal totalAmount;
 
+    private BigDecimal depositAmount;
+
     @Column
     private BigDecimal discountAmount;
 
@@ -63,19 +66,25 @@ public class Order extends BaseEntity{
     @Column
     private BigDecimal amountPaid; // Số tiền đã thanh toán
 
+    private BigDecimal amountRefund;
+
     @Column
     private LocalDateTime paymentTimeout;
+
+    private String billCode;
+
+    private LocalDateTime settlementTime;
 
     @ManyToOne
     @JoinColumn(name = "user_id")
     @JsonBackReference
     private User user;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
-    private List<OrderDetail> orderDetails; // Danh sách OrderDetail
+    private List<OrderDetail> orderDetails;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<Transaction> transactions;
 }

@@ -1,12 +1,18 @@
 package vn.pickleball.identityservice.utils;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Base64;
 
 public class GenerateString {
     private static final String CHAR_LOWER = "abcdefghijklmnopqrstuvwxyz";
     private static final String CHAR_UPPER = CHAR_LOWER.toUpperCase();
     private static final String NUMBER = "0123456789";
     private static final String DATA_FOR_RANDOM_STRING = CHAR_LOWER + CHAR_UPPER + NUMBER;
+    private static final String HMAC_SHA256 = "HmacSHA256";
+    private static final String SALT = "dHRzX2phdmFfMDFAaHlwZXJsb2d5LmNvbTpIeXBlckAxMjN0dHNfamF2YV8wMUBoeXBlcmxvZ3kuY29t";
 
     private static final char[] digits = {
             '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -36,6 +42,26 @@ public class GenerateString {
 
         return sb.toString();
 
+    }
+
+
+    public static String encode(String totalAmount, String paymentAmount, String depositAmount, String bookingDate) {
+        try {
+            String data = totalAmount + "|" + paymentAmount + "|" + depositAmount + "|" +  bookingDate;
+            Mac mac = Mac.getInstance(HMAC_SHA256);
+            SecretKeySpec secretKey = new SecretKeySpec(SALT.getBytes(StandardCharsets.UTF_8), HMAC_SHA256);
+            mac.init(secretKey);
+            byte[] hash = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Error while generating signature", e);
+        }
+    }
+
+    // Hàm kiểm tra signature có hợp lệ không
+    public static boolean isValidSignature(String totalAmount, String paymentAmount, String depositAmount, String bookingDate, String providedSignature) {
+        String expectedSignature = encode(totalAmount,paymentAmount,depositAmount, bookingDate);
+        return expectedSignature.equals(providedSignature);
     }
 
 }

@@ -1,5 +1,6 @@
 package vn.pickleball.identityservice.configuration;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -7,8 +8,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericToStringSerializer;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import vn.pickleball.identityservice.dto.request.UserCreationRequest;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,6 +30,18 @@ public class BeanConfiguration {
         template.setValueSerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
         template.setHashValueSerializer(stringSerializer);
+        return template;
+    }
+
+    @Bean
+    public RedisTemplate<String, UserCreationRequest> redisUserTemplate(RedisConnectionFactory connectionFactory) {
+        RedisTemplate<String, UserCreationRequest> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+
+        template.setKeySerializer(new StringRedisSerializer());
+
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+
         return template;
     }
 

@@ -10,8 +10,9 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-import vn.pickleball.identityservice.dto.notification.NotificationResponse;
+import vn.pickleball.identityservice.dto.payment.NotificationResponse;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

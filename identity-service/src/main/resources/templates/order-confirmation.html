@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Xác nhận đặt lịch thành công</title>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; }
+        h2 { color: #2C3E50; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f8f8f8; }
+        .footer { margin-top: 5px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🔔 Xác nhận đặt lịch thành công</h2>
+    <p>Xin chào <b><span th:text="${customerName}"></span></b>,</p>
+    <p>Đơn đặt lịch của bạn đã được xác nhận. Dưới đây là thông tin chi tiết:</p>
+
+    <p><b>🏟 Sân:</b> <span th:text="${courtName}"></span></p>
+    <p><b>📍 Địa chỉ:</b> <span th:text="${address}"></span></p>
+    <p><b>📅 Ngày đặt:</b> <span th:text="${bookingDate}"></span></p>
+    <p><b>💰 Tổng tiền:</b> <span th:text="${totalAmount}"></span> VNĐ</p>
+    <p><b>💳 Đã thanh toán:</b> <span th:text="${amountPaid}"></span> VNĐ</p>
+    <!--    <p><b>⏳ Hạn thanh toán:</b> <span th:text="${paymentTimeout}"></span></p> -->
+
+    <h3>🔹 Chi tiết lịch đặt:</h3>
+    <table>
+        <thead>
+        <tr>
+            <th>Khung giờ</th>
+            <th>Bắt đầu</th>
+            <th>Kết thúc</th>
+            <th>Giá (VNĐ)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="detail : ${orderDetails}">
+            <td th:text="${detail.courtSlotName}"></td>
+            <td th:text="${detail.startTime}"></td>
+            <td th:text="${detail.endTime}"></td>
+            <td th:text="${detail.price}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <p class="footer">Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi! 🎾</p>
+</div>
+</body>
+</html>

@@ -31,7 +31,7 @@ public class UserUpdateRequest {
 
     String phoneNumber;
 
-    boolean isStudent;
+    boolean student;
 
     UserRank userRank;
 

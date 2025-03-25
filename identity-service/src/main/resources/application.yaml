@@ -25,15 +25,33 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: app.pickleball.vn@gmail.com
+    password: qfqqrtmrgmqpwzpk
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+        debug: false
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
 
 jwt:
   signerKey: ${JWT_KEY:${DEFAULT.JWT_KEY}}
-  valid-duration: 3600 # in second
-  refreshable-duration: 3600 # in seconds
+  valid-duration: 86400 # in second
+  refreshable-duration: 86400 # in seconds
 
 payment:
-  url : https://payment-gateway.hyperlogy.com/api
+  url : https://payment.omnipay.vn/api
   create_qr: /payment/auth/protected/create_qr
+  refund: /payment/auth/protected/refundWithAmount
   check_sum: 20fbb136-cc71-4a51-99eb-634c86ec1ce5
   api_key: 2a903a68-461d-43ea-b66e-4af7253e40fd
   client_id: fd342a17-7fb2-4df1-b907-c0004583746a
