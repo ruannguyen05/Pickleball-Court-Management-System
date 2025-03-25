@@ -58,8 +58,10 @@ public class BookingSlotScheduler {
 
                     // Duyệt qua từng BookingSlotResponse
                     for (BookingSlotResponse slot : bookingSlots) {
-                        if (slot.getEndTime().isBefore(currentTime)) {
-                            slot.setStatus(BookingStatus.LOCKED); // Cập nhật trạng thái thành LOCKED
+                        if (slot.getStatus() == BookingStatus.BOOKED && slot.getEndTime().isBefore(currentTime)) {
+                            slot.setStatus(BookingStatus.LOCK_BOOKED);
+                        } else if (slot.getStatus() == BookingStatus.AVAILABLE && slot.getEndTime().isBefore(currentTime)){
+                            slot.setStatus(BookingStatus.LOCKED);
                         }
                     }
                 }

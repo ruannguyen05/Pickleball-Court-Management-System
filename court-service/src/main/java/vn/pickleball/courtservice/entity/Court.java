@@ -29,19 +29,25 @@ public class Court extends BaseEntity{
 
     private String link;
 
-    private String ownerId;
+    private String managerId;
+
+    private String logoUrl;
+
+    private String backgroundUrl;
 
     @OneToMany(mappedBy = "court")
     @JsonManagedReference
     private List<CourtSlot> courtSlots;
 
-    // 1 Business có nhiều TimeSlot được cấu hình
     @OneToMany(mappedBy = "court")
     @JsonManagedReference
     private List<TimeSlot> timeSlots;
 
-    // 1 Business có nhiều giá cho từng khung giờ và loại khách hàng
     @OneToMany(mappedBy = "court")
     @JsonManagedReference
     private List<CourtPrice> courtPrices;
+
+    @OneToMany(mappedBy = "court")
+    @JsonManagedReference
+    private List<CourtImage> courtImages;
 }

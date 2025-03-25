@@ -2,6 +2,7 @@ package vn.pickleball.courtservice.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -33,6 +34,14 @@ public class GlobalExceptionHandler {
         response.put("message", ex.getMessage());
         response.put("errorCode", "GENERAL_ERROR");
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(value = AccessDeniedException.class)
+    public ResponseEntity<Object> handleAccessDenied(AccessDeniedException exception) {
+        Map<String, String> response = new HashMap<>();
+        response.put("message", exception.getMessage());
+        response.put("errorCode", "403");
+        return new ResponseEntity<>(response, HttpStatus.FORBIDDEN);
     }
 }
 

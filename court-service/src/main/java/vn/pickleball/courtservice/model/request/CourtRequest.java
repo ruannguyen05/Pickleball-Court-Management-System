@@ -1,6 +1,7 @@
 package vn.pickleball.courtservice.model.request;
 
 import lombok.Data;
+import org.springframework.web.multipart.MultipartFile;
 
 @Data
 public class CourtRequest {
@@ -12,4 +13,9 @@ public class CourtRequest {
     private boolean isActive;
     private String email;
     private String link;
+    private String managerId;
+
+    private MultipartFile logoUrl;
+
+    private MultipartFile backgroundUrl;
 }

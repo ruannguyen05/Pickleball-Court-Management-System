@@ -3,12 +3,14 @@ package vn.pickleball.courtservice.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import vn.pickleball.courtservice.entity.CourtImage;
 import vn.pickleball.courtservice.model.request.CourtSlotRequest;
 import vn.pickleball.courtservice.model.request.UpdateBookingSlot;
 import vn.pickleball.courtservice.model.response.CourtPriceResponse;
 import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
 import vn.pickleball.courtservice.model.response.CourtSlotResponse;
 import vn.pickleball.courtservice.service.BookingSlotService;
+import vn.pickleball.courtservice.service.CourtImageService;
 import vn.pickleball.courtservice.service.CourtPriceService;
 import vn.pickleball.courtservice.service.CourtSlotService;
 
@@ -24,6 +26,7 @@ public class PublicController {
     private final CourtSlotService courtSlotService;
     private final CourtPriceService courtPriceService;
     private final BookingSlotService bookingSlotService;
+    private final CourtImageService courtImageService;
 
     @GetMapping("/court_slot/{id}")
     public ResponseEntity<CourtSlotResponse> getCourtSlotById(@PathVariable String id) {
@@ -64,5 +67,12 @@ public class PublicController {
             ) {
         bookingSlotService.updateBookingSlotsInRedis(updateBookingSlot.getCourtId(),updateBookingSlot.getDateBooking(), updateBookingSlot.getStatus(),updateBookingSlot.getCourtSlotBookings());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/court-images/list")
+    public ResponseEntity<List<CourtImage>> getCourtImages(
+            @RequestParam("courtId") String courtId,
+            @RequestParam("isMap") boolean isMap) {
+        return ResponseEntity.ok(courtImageService.getCourtImages(courtId, isMap));
     }
 }

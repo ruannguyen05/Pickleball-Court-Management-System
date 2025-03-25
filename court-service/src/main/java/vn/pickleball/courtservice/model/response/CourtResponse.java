@@ -12,5 +12,8 @@ public class CourtResponse {
     private boolean isActive;
     private String email;
     private String link;
+    private String logoUrl;
+
+    private String backgroundUrl;
 }
 

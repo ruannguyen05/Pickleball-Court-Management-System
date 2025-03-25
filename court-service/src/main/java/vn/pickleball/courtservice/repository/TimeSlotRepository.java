@@ -3,6 +3,7 @@ package vn.pickleball.courtservice.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import vn.pickleball.courtservice.entity.BookingSlot;
 import vn.pickleball.courtservice.entity.TimeSlot;
+import vn.pickleball.courtservice.model.WeekType;
 
 import java.util.List;
 

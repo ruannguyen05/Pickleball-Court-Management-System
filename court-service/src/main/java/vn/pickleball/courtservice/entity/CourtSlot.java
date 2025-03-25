@@ -26,4 +26,8 @@ public class CourtSlot extends BaseEntity{
     @OneToMany(mappedBy = "courtSlot")
     @JsonManagedReference
     private List<BookingSlot> bookingSlots;
+
+    @OneToMany(mappedBy = "courtSlot", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<CourtMaintenanceHistory> maintenanceHistories;
 }

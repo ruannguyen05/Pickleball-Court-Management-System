@@ -1,14 +1,22 @@
 package vn.pickleball.courtservice.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import vn.pickleball.courtservice.entity.CourtPrice;
 import vn.pickleball.courtservice.entity.CourtSlot;
 import vn.pickleball.courtservice.entity.TimeSlot;
+import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.TimeSlotMapper;
 import vn.pickleball.courtservice.model.BookingStatus;
 import vn.pickleball.courtservice.model.WeekType;
+import vn.pickleball.courtservice.model.request.UpdateBookingSlot;
 import vn.pickleball.courtservice.model.response.BookingSlotResponse;
 import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
 import vn.pickleball.courtservice.repository.CourtPriceRepository;
@@ -17,10 +25,9 @@ import vn.pickleball.courtservice.repository.TimeSlotRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
 import java.time.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -36,6 +43,10 @@ public class BookingSlotService {
     private final RedisTemplate<String, Object> redisTemplate;
 
     private final ObjectMapper objectMapper;
+
+    private final RestTemplate restTemplate;
+
+    private final RedisTemplate<String, String> redisString;
 
     private final TimeSlotMapper timeSlotMapper;
 
@@ -106,13 +117,14 @@ public class BookingSlotService {
             // Thêm vào kết quả
             bookingSlotsByCourtSlot.add(courtSlotBookingResponse);
         }
-
+        this.synchronousBooked(bookingSlotsByCourtSlot,courtId,dateBooking);
+        this.lockSlotsByMaintenance(bookingSlotsByCourtSlot,courtId,dateBooking);
         // Tính thời gian hết hạn cho Redis (24h của ngày được chọn trừ cho ngày hiện tại)
         long expireTime = calculateExpireTime(dateBooking);
-
-        // Lưu vào Redis với thời gian hết hạn
-        redisTemplate.opsForValue().set(redisKey, bookingSlotsByCourtSlot, expireTime, TimeUnit.SECONDS);
-
+        if(expireTime > 0) {
+            // Lưu vào Redis với thời gian hết hạn
+            redisTemplate.opsForValue().set(redisKey, bookingSlotsByCourtSlot, expireTime, TimeUnit.SECONDS);
+        }
         return bookingSlotsByCourtSlot;
     }
 
@@ -156,10 +168,35 @@ public class BookingSlotService {
         return splitSlots;
     }
 
+    private void synchronousBooked (List<CourtSlotBookingResponse> bookingSlotsByCourtSlot, String courtId, LocalDate bookingDate){
+        UpdateBookingSlot updateBookingSlot = this.getBookedSlots(courtId,bookingDate);
+        if(updateBookingSlot == null) return;
+        // Duyệt qua từng courtSlotId và cập nhật trạng thái
+        for (Map.Entry<String, List<LocalTime>> entry : updateBookingSlot.getCourtSlotBookings().entrySet()) {
+            String courtSlotName = entry.getKey();
+            List<LocalTime> startTimes = entry.getValue();
+
+            // Tìm CourtSlotBookingResponse tương ứng với courtSlotId
+            CourtSlotBookingResponse courtSlotBookingResponse = bookingSlotsByCourtSlot.stream()
+                    .filter(response -> response.getCourtSlotName().equals(courtSlotName))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy courtSlotName trong Redis: " + courtSlotName));
+
+            // Cập nhật trạng thái của các khung giờ được đặt
+            List<BookingSlotResponse> bookingSlots = courtSlotBookingResponse.getBookingSlots();
+            for (BookingSlotResponse slot : bookingSlots) {
+                if (startTimes.contains(slot.getStartTime())) {
+                    slot.setStatus(BookingStatus.BOOKED);
+                }
+            }
+        }
+    }
+
+
     private long calculateExpireTime(LocalDate dateBooking) {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime endOfDay = dateBooking.atTime(23, 59, 59); // Cuối ngày được chọn
-        return Duration.between(now, endOfDay).getSeconds(); // Thời gian còn lại đến cuối ngày
+        LocalDateTime endOfDay = dateBooking.atTime(23, 59, 59);
+        return Duration.between(now, endOfDay).getSeconds();
     }
 
     public List<CourtSlotBookingResponse> getBookingSlotsRedis(String courtId, LocalDate dateBooking) {
@@ -204,7 +241,10 @@ public class BookingSlotService {
             List<BookingSlotResponse> bookingSlots = courtSlotBookingResponse.getBookingSlots();
             for (BookingSlotResponse slot : bookingSlots) {
                 if (startTimes.contains(slot.getStartTime())) {
-                    slot.setStatus(status); // Cập nhật trạng thái thành BOOKED
+                    if(status.equals(BookingStatus.BOOKED) && !slot.getStatus().equals(BookingStatus.AVAILABLE)){
+                        throw new ApiException("slot not available", "INVALID_SLOT");
+                    }
+                    slot.setStatus(status);
                 }else if (slot.getEndTime().isBefore(LocalTime.now()) && !dateBooking.isAfter(LocalDate.now())) {
                     slot.setStatus(BookingStatus.LOCKED);
                 }
@@ -214,4 +254,57 @@ public class BookingSlotService {
         // Lưu lại vào Redis
         redisTemplate.opsForValue().set(redisKey, cachedSlots);
     }
+
+    public UpdateBookingSlot getBookedSlots(String courtId, LocalDate bookingDate) {
+//        String url = UriComponentsBuilder.fromHttpUrl("http://localhost:8081/identity/public/booked-slots")
+        String url = UriComponentsBuilder.fromHttpUrl("http://203.145.46.242:8080/api/identity/public/booked-slots")
+                .queryParam("courtId", courtId)
+                .queryParam("bookingDate", bookingDate)
+                .toUriString();
+
+        ResponseEntity<UpdateBookingSlot> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {}
+        );
+
+        return response.getBody();
+    }
+
+    public void deleteBookingSlotsByCourtId(String courtId) {
+        String pattern = REDIS_KEY_PREFIX + courtId + ":*";
+
+        Set<String> keysToDelete = redisTemplate.keys(pattern);
+
+        if (keysToDelete != null && !keysToDelete.isEmpty()) {
+            redisTemplate.delete(keysToDelete);
+        }
+    }
+
+    public void lockSlotsByMaintenance(List<CourtSlotBookingResponse> courtSlotBookingResponses, String courtId, LocalDate date) {
+        for (CourtSlotBookingResponse courtSlotBooking : courtSlotBookingResponses) {
+            String courtSlotId = courtSlotBooking.getCourtSlotId();
+            String key = String.format("maintenance:%s:%s:%s", courtId, courtSlotId, date);
+            String maintenanceTimeRange = redisString.opsForValue().get(key);
+
+            if (maintenanceTimeRange != null && maintenanceTimeRange.contains(" - ")) {
+                String[] timeRange = maintenanceTimeRange.split(" - ");
+                LocalTime maintenanceStartTime = LocalTime.parse(timeRange[0]);
+                LocalTime maintenanceEndTime = LocalTime.parse(timeRange[1]);
+
+                for (BookingSlotResponse slot : courtSlotBooking.getBookingSlots()) {
+                    LocalTime slotStartTime = slot.getStartTime();
+                    LocalTime slotEndTime = slot.getEndTime();
+
+                    if ((slotStartTime.equals(maintenanceStartTime) || slotStartTime.isAfter(maintenanceStartTime))
+                            && slotStartTime.isBefore(maintenanceEndTime)) {
+                        slot.setStatus(BookingStatus.LOCKED);
+                    }
+                }
+            }
+        }
+    }
+
+
 }
