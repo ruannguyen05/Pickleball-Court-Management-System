@@ -15,11 +15,11 @@ public class RefundScheduler {
     @Autowired
     private OrderService orderService;
 
-//    @Scheduled(cron = "0 0/30 * * * ?")
-//    private void refund(){
-//        log.info("Execute refund job");
-//        List<Order> orders = orderService.getUnsettledOrders();
-//
-//        orders.forEach(o -> orderService.refundByJob(o));
-//    }
+    @Scheduled(cron = "0 0/30 * * * ?")
+    private void refund(){
+        log.info("Execute refund job");
+        List<Order> orders = orderService.getOrderRefund();
+
+        orders.forEach(o -> orderService.refundByJob(o));
+    }
 }

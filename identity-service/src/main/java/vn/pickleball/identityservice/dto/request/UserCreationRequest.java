@@ -49,4 +49,7 @@ public class UserCreationRequest implements Serializable {
 
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     Gender gender;
+
+    private String courtId;
+
 }

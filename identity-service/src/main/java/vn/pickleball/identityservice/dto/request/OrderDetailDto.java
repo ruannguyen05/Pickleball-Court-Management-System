@@ -1,17 +1,19 @@
-package vn.pickleball.identityservice.dto.response;
+package vn.pickleball.identityservice.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
 
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
-public class OrderDetailResponse {
+public class OrderDetailDto {
+    private String courtSlotId;
     private String courtSlotName;
     private LocalTime startTime;
     private LocalTime endTime;
-    private List<LocalDate> bookingDates;
+    private BigDecimal price;
 }

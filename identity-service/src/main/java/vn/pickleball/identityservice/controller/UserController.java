@@ -5,10 +5,14 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.identityservice.dto.request.ApiResponse;
+import vn.pickleball.identityservice.dto.request.ChangePasswordRequest;
 import vn.pickleball.identityservice.dto.request.UserCreationRequest;
 import vn.pickleball.identityservice.dto.request.UserUpdateRequest;
+import vn.pickleball.identityservice.dto.response.PagedUserResponse;
 import vn.pickleball.identityservice.dto.response.UserResponse;
 import vn.pickleball.identityservice.service.UserService;
 
@@ -37,10 +41,15 @@ public class UserController {
 
 
     @GetMapping
-    ApiResponse<List<UserResponse>> getUsers() {
-        return ApiResponse.<List<UserResponse>>builder()
-                .result(userService.getUsers())
-                .build();
+    public ResponseEntity<PagedUserResponse> getUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) String email,
+            @RequestParam(required = false) String roleName
+    ) {
+        return ResponseEntity.ok(userService.getUsers(page, size, username, phoneNumber, email, roleName));
     }
 
     @GetMapping("/getUsersWithRole")
@@ -62,6 +71,15 @@ public class UserController {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.getMyInfo())
                 .build();
+    }
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
+        userService.changePassword(request);
+        return ResponseEntity.ok("Password changed successfully");
+    }
+    @PostMapping("/upload-avatar")
+    public ResponseEntity<?> changePassword(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(userService.updateAvatar(file));
     }
 
     @DeleteMapping("/{userId}")
@@ -90,4 +108,11 @@ public class UserController {
                 .result(userService.createUserByAdmin(request))
                 .build();
     }
+
+    @PutMapping("/activate")
+    public ResponseEntity<String> updateUserStatus(@RequestParam String userId, @RequestParam boolean isActive) {
+        userService.updateUserStatus(userId, isActive);
+        return ResponseEntity.ok(isActive ? "User activated successfully" : "User disabled successfully");
+    }
+
 }

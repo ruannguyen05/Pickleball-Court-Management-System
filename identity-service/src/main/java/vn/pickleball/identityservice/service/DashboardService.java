@@ -34,7 +34,6 @@ public class DashboardService {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
 
-    @PreAuthorize("hasRole('ADMIN')")
     public TransactionResponse getTransactionsWithSummary(String paymentStatus, String courtId, String orderId,
                                                           LocalDateTime startDate, LocalDateTime endDate,
                                                           int page, int size) {
@@ -58,7 +57,6 @@ public class DashboardService {
                 .build();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     public OrderPage searchOrders(String courtId, String orderStatus, String paymentStatus,
                                     LocalDate startDate, LocalDate endDate, int page, int size) {
         PageRequest pageable = PageRequest.of(page - 1, size);
@@ -73,7 +71,6 @@ public class DashboardService {
                 .build();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     public List<TransactionDto> getTransactionByOrderId(String orderId){
         List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
 

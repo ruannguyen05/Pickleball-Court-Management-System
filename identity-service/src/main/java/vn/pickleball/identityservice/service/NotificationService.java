@@ -24,11 +24,21 @@ public class NotificationService {
     // Lưu thông báo mới
     public NotificationRequest saveNotification(NotificationRequest request, String phoneNumber) {
         User user = userRepository.findByIdOrPhoneNumber(phoneNumber)
-                .orElseThrow(() -> null);
+                .orElse(null);
 
         Notification notification = notificationMapper.toEntity(request);
         notification.setUser(user);
         notification.setPhoneNumber(phoneNumber);
+        notification.setCreateAt(LocalDateTime.now());
+
+        return notificationMapper.toDto(notificationRepository.save(notification));
+    }
+
+    public NotificationRequest saveNotificationManagerAndStaff(NotificationRequest request, User user) {
+
+        Notification notification = notificationMapper.toEntity(request);
+        notification.setUser(user);
+        notification.setPhoneNumber(user.getPhoneNumber());
         notification.setCreateAt(LocalDateTime.now());
 
         return notificationMapper.toDto(notificationRepository.save(notification));

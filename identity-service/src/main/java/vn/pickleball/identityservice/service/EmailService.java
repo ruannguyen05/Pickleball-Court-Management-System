@@ -11,11 +11,19 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import vn.pickleball.identityservice.dto.request.OrderDetailDto;
 import vn.pickleball.identityservice.dto.request.OrderDetailRequest;
+import vn.pickleball.identityservice.dto.response.OrderDetailResponse;
 import vn.pickleball.identityservice.dto.response.OrderResponse;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,24 +47,35 @@ public class EmailService {
             context.setVariable("customerName", orderResponse.getCustomerName());
             context.setVariable("courtName", orderResponse.getCourtName());
             context.setVariable("address", orderResponse.getAddress());
-            context.setVariable("bookingDate", orderResponse.getBookingDate().toString());
+
+            // Nhóm các OrderDetailResponse theo courtSlotName
+            Map<String, List<OrderDetailResponse>> groupedByCourtSlot = new LinkedHashMap<>();
+            for (OrderDetailResponse detail : orderResponse.getOrderDetails()) {
+                groupedByCourtSlot
+                        .computeIfAbsent(detail.getCourtSlotName(), k -> new ArrayList<>())
+                        .add(detail);
+            }
+
+            context.setVariable("groupedByCourtSlot", groupedByCourtSlot);
             context.setVariable("totalAmount", formatCurrency(orderResponse.getTotalAmount()));
-            context.setVariable("amountPaid", formatCurrency(orderResponse.getAmountPaid()));
-//        context.setVariable("paymentTimeout", orderResponse.getPaymentTimeout().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            context.setVariable("amountPaid",
+                    orderResponse.getAmountPaid() != null ? formatCurrency(orderResponse.getAmountPaid()) : "Chưa thanh toán"
+            );
 
-            context.setVariable("orderDetails", orderResponse.getOrderDetails());
-
+            // Render email từ template
             String htmlContent = templateEngine.process("order-confirmation", context);
-
             helper.setText(htmlContent, true);
-
 
             mailSender.send(message);
         } catch (MessagingException e) {
-            log.error("Send mail error to - {}",to);
+            log.error("Send mail error to - {}", to);
             throw new RuntimeException(e);
         }
     }
+
+
+
+
 
     @Async
     public void sendRegistrationConfirmationEmail(String to, String phoneNumber, String customerName) {

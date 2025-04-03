@@ -18,7 +18,6 @@ public class UserUpdateRequest {
     String id;
     String username;
 
-    String password;
     String firstName;
     String lastName;
 
@@ -36,4 +35,8 @@ public class UserUpdateRequest {
     UserRank userRank;
 
     Gender gender;
+
+    private String courtId;
+
+    private boolean isActive;
 }

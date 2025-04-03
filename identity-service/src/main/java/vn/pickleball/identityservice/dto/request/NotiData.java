@@ -14,6 +14,4 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class NotiData {
     private String orderId;
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    private LocalDate dateBooking;
 }

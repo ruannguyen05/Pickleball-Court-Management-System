@@ -1,6 +1,7 @@
 package vn.pickleball.identityservice.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -15,4 +16,10 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, String
 
     @Query("SELECT od FROM OrderDetail od WHERE od.order.bookingDate = :bookingDate")
     List<OrderDetail> findAllByBookingDate(@Param("bookingDate") LocalDate bookingDate);
+
+    @Modifying
+    @Query("DELETE FROM OrderDetail od WHERE od.order = :order")
+    void deleteByOrder(@Param("order") Order order);
+
+    void deleteByOrderId(String orderId);
 }

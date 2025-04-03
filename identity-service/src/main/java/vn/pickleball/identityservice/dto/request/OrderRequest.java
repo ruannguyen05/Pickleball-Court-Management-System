@@ -17,10 +17,6 @@ public class OrderRequest {
     @NotBlank(message = "Address is required")
     private String address;
 
-    @NotNull(message = "Booking date is required")
-    @FutureOrPresent(message = "Booking date must be today or in the future")
-    private LocalDate bookingDate;
-
     private String userId;
 
     @NotBlank(message = "Customer name is required")

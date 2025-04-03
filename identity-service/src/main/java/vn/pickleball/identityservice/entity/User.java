@@ -51,6 +51,8 @@ public class User extends BaseEntity{
     @Enumerated(EnumType.STRING)
     private UserRank userRank;
 
+    private String courtId;
+
     @ManyToMany
     Set<Role> roles;
 
@@ -62,4 +64,8 @@ public class User extends BaseEntity{
     @JsonManagedReference
     @JsonIgnore
     private List<Notification> notifications;
+
+    private String avatar;
+
+    private boolean isActive;
 }

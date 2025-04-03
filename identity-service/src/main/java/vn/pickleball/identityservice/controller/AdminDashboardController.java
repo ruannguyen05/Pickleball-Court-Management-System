@@ -6,16 +6,17 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 import vn.pickleball.identityservice.dto.response.OrderPage;
 import vn.pickleball.identityservice.dto.response.TransactionDto;
 import vn.pickleball.identityservice.dto.response.TransactionResponse;
 import vn.pickleball.identityservice.entity.Order;
 import vn.pickleball.identityservice.service.DashboardService;
+import vn.pickleball.identityservice.service.OrderService;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,8 +26,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminDashboardController {
     private final DashboardService dashboardService;
+    private final OrderService orderService;
 
     @GetMapping("/transactions")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public TransactionResponse getTransactions(
             @RequestParam(required = false) String paymentStatus,
             @RequestParam(required = false) String courtId,
@@ -40,6 +43,7 @@ public class AdminDashboardController {
     }
 
     @GetMapping("/orders")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public OrderPage getOrders(
             @RequestParam(required = false) String courtId,
             @RequestParam(required = false) String orderStatus,
@@ -53,7 +57,16 @@ public class AdminDashboardController {
     }
 
     @GetMapping("/getTransactionByOid")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public List<TransactionDto> getTransactionsByOid(@RequestParam String orderId){
         return dashboardService.getTransactionByOrderId(orderId);
+    }
+
+    @PostMapping("/refund")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<String> refundByAdmin(@RequestParam String orderId,
+                                                @RequestParam BigDecimal refundAmount) {
+        orderService.refundByAdmin(orderId, refundAmount);
+        return ResponseEntity.ok("Refund processed successfully");
     }
 }

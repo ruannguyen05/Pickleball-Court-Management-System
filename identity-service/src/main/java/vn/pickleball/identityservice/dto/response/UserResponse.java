@@ -29,4 +29,10 @@ public class UserResponse {
     UserRank userRank;
 
     Gender gender;
+
+    private String courtId;
+
+    private String avatar;
+
+    private boolean isActive;
 }

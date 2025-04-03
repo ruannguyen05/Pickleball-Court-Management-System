@@ -7,10 +7,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.pickleball.identityservice.dto.payment.MbVietQrRefundWithAmountRequest;
-import vn.pickleball.identityservice.dto.request.FCMTokenRequest;
-import vn.pickleball.identityservice.dto.request.NotificationRequest;
-import vn.pickleball.identityservice.dto.request.OrderRequest;
-import vn.pickleball.identityservice.dto.request.UpdateBookingSlot;
+import vn.pickleball.identityservice.dto.request.*;
+import vn.pickleball.identityservice.dto.response.FixedBookingResponse;
 import vn.pickleball.identityservice.dto.response.NotificationResponse;
 import vn.pickleball.identityservice.dto.response.OrderResponse;
 import vn.pickleball.identityservice.dto.response.PaymentData;
@@ -20,8 +18,12 @@ import vn.pickleball.identityservice.service.NotificationService;
 import vn.pickleball.identityservice.service.OrderService;
 import vn.pickleball.identityservice.utils.GenerateString;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/public")
@@ -102,11 +104,11 @@ public class PublicController {
         return ResponseEntity.ok(notificationService.courtUnRead(value));
     }
 
-    @PostMapping("/sendEmail")
-    public String sendEmal(@RequestBody OrderResponse response){
-        emailService.sendBookingConfirmationEmail("ruannvhe160301@fpt.edu.vn",response);
-        return "success";
-    }
+//    @PostMapping("/sendEmail")
+//    public String sendEmal(@RequestBody OrderResponse response){
+//        emailService.sendBookingConfirmationEmail("ruannvhe160301@fpt.edu.vn",response);
+//        return "success";
+//    }
 
     @PostMapping("/test_send-fcm")
     public void testFCM(@RequestParam String key){
@@ -126,6 +128,42 @@ public class PublicController {
     public String getSignature(@RequestParam String totalAmount,@RequestParam String paymentAmount,
                                @RequestParam String depositAmount,@RequestParam String bookingDate){
         return GenerateString.encode(totalAmount,paymentAmount,depositAmount, bookingDate);
+    }
+
+    @GetMapping("/check-invalid-slots")
+    public ResponseEntity<Map<String, Object>> checkInvalidCourtSlots(
+            @RequestParam String courtId,
+            @RequestParam String daysOfWeek, // "MONDAY,TUESDAY"
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime endTime) {
+
+        List<LocalDate> bookingDates = orderService.getBookingDatesFromDaysOfWeek(startDate, endDate, daysOfWeek);
+
+        Map<String, Object> response = orderService.getInvalidCourtSlots(
+                courtId, bookingDates, startTime, endTime);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/payment-value")
+    public BigDecimal getPaymentValue(
+            @RequestParam String courtId,
+            @RequestParam String daysOfWeek, // "MONDAY,TUESDAY"
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startTime,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime endTime) {
+
+        List<LocalDate> bookingDates = orderService.getBookingDatesFromDaysOfWeek(startDate, endDate, daysOfWeek);
+
+        return orderService.getPaymentAmount(courtId,bookingDates,startTime,endTime);
+    }
+
+    @PostMapping("/order-fixed")
+    public ResponseEntity<OrderResponse> createFixedBooking(@RequestBody @Valid FixedBookingRequest request) {
+        OrderResponse response = orderService.createFixedBooking(request);
+        return ResponseEntity.ok(response);
     }
 
 }

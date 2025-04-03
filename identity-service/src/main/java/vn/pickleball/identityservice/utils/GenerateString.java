@@ -59,8 +59,8 @@ public class GenerateString {
     }
 
     // Hàm kiểm tra signature có hợp lệ không
-    public static boolean isValidSignature(String totalAmount, String paymentAmount, String depositAmount, String bookingDate, String providedSignature) {
-        String expectedSignature = encode(totalAmount,paymentAmount,depositAmount, bookingDate);
+    public static boolean isValidSignature(String totalAmount, String paymentAmount, String depositAmount, String phoneNumber, String providedSignature) {
+        String expectedSignature = encode(totalAmount,paymentAmount,depositAmount, phoneNumber);
         return expectedSignature.equals(providedSignature);
     }
 
