@@ -14,8 +14,4 @@ public class CourtRequest {
     private String email;
     private String link;
     private String managerId;
-
-    private MultipartFile logoUrl;
-
-    private MultipartFile backgroundUrl;
 }

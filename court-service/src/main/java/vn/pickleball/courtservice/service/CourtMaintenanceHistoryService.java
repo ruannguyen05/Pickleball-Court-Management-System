@@ -5,6 +5,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -17,12 +18,12 @@ import vn.pickleball.courtservice.model.response.CourtMaintenanceHistoryResponse
 import vn.pickleball.courtservice.repository.CourtMaintenanceHistoryRepository;
 import vn.pickleball.courtservice.repository.CourtSlotRepository;
 
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -34,25 +35,95 @@ public class CourtMaintenanceHistoryService {
     private final CourtSlotRepository courtSlotRepository;
     private final RestTemplate restTemplate;
     private final RedisTemplate<String, String> redisString;
+    private final BookingSlotService bookingSlotService;
 
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
     public void addMaintenanceHistory(CourtMaintenanceHistoryRequestDTO dto) {
         CourtSlot courtSlot = courtSlotRepository.findById(dto.getCourtSlotId())
                 .orElseThrow(() -> new RuntimeException("Court slot not found"));
 
-        LocalDateTime startTime = dto.getStartTime();
-        LocalDateTime endTime = dto.getEndTime();
+        checkBookingConflicts(courtSlot, dto.getStartTime(), dto.getEndTime());
 
-        // Lặp qua từng ngày trong khoảng startTime -> endTime
+        CourtMaintenanceHistory history = new CourtMaintenanceHistory();
+        history.setCourtSlot(courtSlot);
+        history.setStartTime(dto.getStartTime());
+        history.setEndTime(dto.getEndTime());
+        history.setFinishAt(dto.getFinishAt());
+        history.setDescription(dto.getDescription());
+
+        maintenanceHistoryRepository.save(history);
+        bookingSlotService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
+        saveMaintenanceToRedis(courtSlot.getCourt().getId(), courtSlot.getId(), dto.getStartTime(), dto.getEndTime());
+    }
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
+    public void updateMaintenanceHistory(CourtMaintenanceHistoryRequestDTO dto) {
+        CourtMaintenanceHistory history = maintenanceHistoryRepository.findById(dto.getId())
+                .orElseThrow(() -> new RuntimeException("Maintenance history not found"));
+
+        String courtId = history.getCourtSlot().getCourt().getId();
+        String courtSlotId = history.getCourtSlot().getId();
+
+        if(dto.getStatus() == null || dto.getStatus().isEmpty()) throw new ApiException("thiếu trạng thái bảo trì", "STATUS_NULL");
+
+        if (dto.getStatus().equals("Đổi lịch")) {
+            checkBookingConflicts(history.getCourtSlot(), dto.getStartTime(), dto.getEndTime());
+
+            // Xóa redis cũ
+            deleteMaintenanceFromRedis(courtId, courtSlotId, history.getStartTime(), history.getEndTime());
+
+            // Update thông tin
+            history.setStartTime(dto.getStartTime());
+            history.setEndTime(dto.getEndTime());
+            history.setDescription(dto.getDescription());
+            history.setFinishAt(dto.getFinishAt());
+            history.setStatus(dto.getStatus());
+            maintenanceHistoryRepository.save(history);
+
+            // Lưu redis mới
+            saveMaintenanceToRedis(courtId, courtSlotId, dto.getStartTime(), dto.getEndTime());
+        } else {
+            // Cập nhật trạng thái hoàn thành hoặc hủy
+            history.setFinishAt(LocalDateTime.now());
+            history.setStatus(dto.getStatus());
+            maintenanceHistoryRepository.save(history);
+
+            // Xóa redis cũ
+            deleteMaintenanceFromRedis(courtId, courtSlotId, history.getStartTime(), history.getEndTime());
+
+        }
+        bookingSlotService.deleteBookingSlotsByCourtId(history.getCourtSlot().getCourt().getId());
+    }
+
+
+    public void finishMaintenance(String maintenanceHistoryId) {
+        CourtMaintenanceHistory history = maintenanceHistoryRepository.findById(maintenanceHistoryId)
+                .orElseThrow(() -> new RuntimeException("Maintenance history not found"));
+
+        // Cập nhật finishAt
+        history.setFinishAt(LocalDateTime.now());
+        maintenanceHistoryRepository.save(history);
+        bookingSlotService.deleteBookingSlotsByCourtId(history.getCourtSlot().getCourt().getId());
+        // Xóa Redis key tương ứng
+        deleteMaintenanceFromRedis(
+                history.getCourtSlot().getCourt().getId(),
+                history.getCourtSlot().getId(),
+                history.getStartTime(),
+                history.getEndTime()
+        );
+    }
+
+
+    private void checkBookingConflicts(CourtSlot courtSlot, LocalDateTime startTime, LocalDateTime endTime) {
         LocalDate startDate = startTime.toLocalDate();
         LocalDate endDate = endTime.toLocalDate();
         LocalDate currentDate = startDate;
 
         while (!currentDate.isAfter(endDate)) {
-            // Xác định khoảng thời gian check trên từng ngày
             LocalDateTime dayStartTime = currentDate.equals(startDate) ? startTime : currentDate.atStartOfDay();
             LocalDateTime dayEndTime = currentDate.equals(endDate) ? endTime : currentDate.atTime(LocalTime.MAX);
 
-            // Gọi API để lấy slot đã booking cho ngày hiện tại
             String url = UriComponentsBuilder.fromHttpUrl("http://203.145.46.242:8080/api/identity/public/booked-slots")
                     .queryParam("courtId", courtSlot.getCourt().getId())
                     .queryParam("bookingDate", currentDate)
@@ -68,34 +139,23 @@ public class CourtMaintenanceHistoryService {
             UpdateBookingSlot bookingSlot = response.getBody();
 
             if (bookingSlot != null && bookingSlot.getCourtSlotBookings() != null) {
-                Map<String, List<LocalTime>> courtSlotBookings = bookingSlot.getCourtSlotBookings();
-                List<LocalTime> bookedTimes = courtSlotBookings.getOrDefault(courtSlot.getName(), List.of());
+                List<LocalTime> bookedTimes = bookingSlot.getCourtSlotBookings()
+                        .getOrDefault(courtSlot.getName(), List.of());
 
                 for (LocalTime bookedTime : bookedTimes) {
                     LocalDateTime bookedDateTime = LocalDateTime.of(currentDate, bookedTime);
 
-                    // Nếu thời gian đã đặt nằm trong khoảng bảo trì thì không cho phép tạo lịch bảo trì
                     if (!bookedDateTime.isBefore(dayStartTime) && !bookedDateTime.isAfter(dayEndTime)) {
                         throw new ApiException("CourtSlot '" + courtSlot.getName() +
                                 "' đã có booking trong khoảng bảo trì tại thời điểm: " + bookedDateTime, "MAINTENANCE_ERROR");
                     }
                 }
             }
-
             currentDate = currentDate.plusDays(1);
         }
-
-        CourtMaintenanceHistory history = new CourtMaintenanceHistory();
-        history.setCourtSlot(courtSlot);
-        history.setStartTime(dto.getStartTime());
-        history.setEndTime(dto.getEndTime());
-        history.setFinishAt(dto.getFinishAt());
-        history.setDescription(dto.getDescription());
-
-        maintenanceHistoryRepository.save(history);
-        saveMaintenanceToRedis(courtSlot.getCourt().getId(), courtSlot.getId(), dto.getStartTime(), dto.getEndTime());
     }
 
+        @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
     public List<CourtMaintenanceHistoryResponseDTO> getHistoriesByCourtSlotId(String courtSlotId) {
         return maintenanceHistoryRepository.findByCourtSlotIdOrderByStartTimeDesc(courtSlotId)
                 .stream()
@@ -106,18 +166,12 @@ public class CourtMaintenanceHistoryService {
                     dto.setEndTime(history.getEndTime());
                     dto.setFinishAt(history.getFinishAt());
                     dto.setDescription(history.getDescription());
+                    dto.setStatus(history.getStatus());
                     return dto;
                 })
                 .collect(Collectors.toList());
     }
 
-    public void finishMaintenance(String maintenanceHistoryId) {
-        CourtMaintenanceHistory history = maintenanceHistoryRepository.findById(maintenanceHistoryId)
-                .orElseThrow(() -> new RuntimeException("Maintenance history not found"));
-
-        history.setFinishAt(LocalDateTime.now());
-        maintenanceHistoryRepository.save(history);
-    }
 
     private void saveMaintenanceToRedis(String courtId, String courtSlotId, LocalDateTime startTime, LocalDateTime endTime) {
         LocalDate startDate = startTime.toLocalDate();
@@ -141,6 +195,72 @@ public class CourtMaintenanceHistoryService {
             }
 
             currentDate = currentDate.plusDays(1);
+        }
+    }
+    private void deleteMaintenanceFromRedis(String courtId, String courtSlotId, LocalDateTime startTime, LocalDateTime endTime) {
+        LocalDate startDate = startTime.toLocalDate();
+        LocalDate endDate = endTime.toLocalDate();
+        LocalDate currentDate = startDate;
+
+        while (!currentDate.isAfter(endDate)) {
+            String key = String.format("maintenance:%s:%s:%s", courtId, courtSlotId, currentDate);
+            redisString.delete(key);
+            currentDate = currentDate.plusDays(1);
+        }
+    }
+
+    public Map<String, List<LocalDate>> getMaintenanceCourtSlots(String courtId,
+                                                                 List<LocalDate> bookingDates,
+                                                                 LocalTime startTime,
+                                                                 LocalTime endTime) {
+        List<Object[]> maintenanceSlots = maintenanceHistoryRepository.findMaintenanceCourtSlots(
+                courtId, bookingDates, startTime, endTime);
+
+        Map<String, List<LocalDate>> invalidCourtSlots = new HashMap<>();
+
+        for (Object[] maintenance : maintenanceSlots) {
+            String courtSlotId = (String) maintenance[0];
+
+            Object dateObject = maintenance[1]; // Lấy giá trị ngày
+            LocalDate date;
+
+            if (dateObject instanceof java.sql.Date) {
+                date = ((java.sql.Date) dateObject).toLocalDate();
+            } else if (dateObject instanceof Timestamp) {
+                date = ((Timestamp) dateObject).toLocalDateTime().toLocalDate();
+            } else {
+                throw new IllegalStateException("Unexpected type for date: " + dateObject.getClass());
+            }
+
+            invalidCourtSlots.computeIfAbsent(courtSlotId, k -> new ArrayList<>()).add(date);
+        }
+
+        return invalidCourtSlots;
+    }
+
+    public void checkAndNotifyMaintenance() {
+        LocalDate today = LocalDate.now();
+        List<CourtMaintenanceHistory> pendingMaintenances =
+                maintenanceHistoryRepository.findAllPendingMaintenances("Hoàn thành", today);
+
+        for (CourtMaintenanceHistory maintenance : pendingMaintenances) {
+            CourtSlot courtSlot = maintenance.getCourtSlot();
+            String courtId = courtSlot.getCourt().getId();
+            String courtSlotId = courtSlot.getId();
+
+            sendMaintenanceNotification(courtId, courtSlotId);
+        }
+    }
+
+    public void sendMaintenanceNotification(String courtId, String courtSlotId) {
+        String url = "http://203.145.46.242:8080/api/identity/public/noti/maintenance?courtId=" + courtId + "&courtSlotId=" + courtSlotId;
+
+        ResponseEntity<String> response = restTemplate.postForEntity(url, null, String.class);
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            System.out.println("Notification sent successfully: " + response.getBody());
+        } else {
+            System.out.println("Failed to send notification: " + response.getStatusCode());
         }
     }
 

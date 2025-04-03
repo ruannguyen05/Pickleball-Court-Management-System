@@ -10,5 +10,6 @@ public class CourtMaintenanceHistoryResponseDTO {
     private LocalDateTime endTime;
     private LocalDateTime finishAt;
     private String description;
+    private String status;
 }
 

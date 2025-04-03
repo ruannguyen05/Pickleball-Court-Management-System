@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.pickleball.courtservice.Utils.AuthorizationService;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtSlot;
+import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtSlotMapper;
 import vn.pickleball.courtservice.model.request.CourtSlotRequest;
 import vn.pickleball.courtservice.model.response.CourtSlotResponse;
@@ -42,6 +43,10 @@ public class CourtSlotService {
         Court court = courtRepository.findById(courtSlotRequest.getCourtId())
                 .orElseThrow(() -> new RuntimeException("Court not found"));
 
+        CourtSlot exist = courtSlotRepository.findByCourtIdAndName(court.getId(), courtSlotRequest.getName()).orElse(null);
+
+        if(exist != null) throw new ApiException("CourtSlot name existed!", "NAME_EXIST");
+
         CourtSlot courtSlot = courtSlotMapper.courtSlotRequestToCourtSlot(courtSlotRequest);
         courtSlot.setCourt(court);
         courtSlot.setActive(true);
@@ -67,7 +72,9 @@ public class CourtSlotService {
     public CourtSlotResponse updateCourtSlot(CourtSlotRequest courtSlotRequest) {
         CourtSlot courtSlot = courtSlotRepository.findById(courtSlotRequest.getId())
                 .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
+        CourtSlot exist = courtSlotRepository.findByCourtIdAndName(courtSlot.getCourt().getId(), courtSlotRequest.getName()).orElse(null);
 
+        if(exist != null) throw new ApiException("CourtSlot name existed!", "NAME_EXIST");
         courtSlot.setName(courtSlotRequest.getName());
         courtSlot.setActive(courtSlotRequest.isActive());
 
@@ -106,5 +113,10 @@ public class CourtSlotService {
         return courtSlots.stream()
                 .map(courtSlotMapper::courtSlotToCourtSlotResponse)
                 .collect(Collectors.toList());
+    }
+
+    public CourtSlotResponse getByName(String courtId, String name){
+        CourtSlot exist = courtSlotRepository.findByCourtIdAndName(courtId, name).orElseThrow(() -> new RuntimeException("CourtSlot not found"));
+        return courtSlotMapper.courtSlotToCourtSlotResponse(exist);
     }
 }

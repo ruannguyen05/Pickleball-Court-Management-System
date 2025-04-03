@@ -41,27 +41,7 @@ public class CourtService {
     public CourtResponse createCourt(CourtRequest courtRequest) {
         Court court = courtMapper.courtRequestToCourt(courtRequest);
         court.setActive(true);
-        Court savedCourt = courtRepository.save(court);
-        try {
-
-            if (courtRequest.getLogoUrl() != null && !courtRequest.getLogoUrl().isEmpty()) {
-                String logoPath = null;
-
-                logoPath = firebaseStorageService.uploadFile(courtRequest.getLogoUrl(), "courts/" + savedCourt.getId() + "/logo");
-
-                savedCourt.setLogoUrl(logoPath);
-            }
-
-            if (courtRequest.getBackgroundUrl() != null && !courtRequest.getBackgroundUrl().isEmpty()) {
-                String bgPath = firebaseStorageService.uploadFile(courtRequest.getBackgroundUrl(), "courts/" + savedCourt.getId() + "/background");
-                savedCourt.setBackgroundUrl(bgPath);
-            }
-
-            Court updatedCourt = courtRepository.save(savedCourt);
-            return courtMapper.courtToCourtResponse(updatedCourt);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        return courtMapper.courtToCourtResponse(courtRepository.save(court));
     }
 
 
@@ -99,34 +79,10 @@ public class CourtService {
     public CourtResponse updateCourt(CourtRequest courtRequest) {
         Court existingCourt = courtRepository.findById(courtRequest.getId())
                 .orElseThrow(() -> new RuntimeException("Court not found"));
-
-        try {
-
-            courtMapper.updateCourt(existingCourt, courtRequest);
-
-            if (courtRequest.getLogoUrl() != null && !courtRequest.getLogoUrl().isEmpty()) {
-                if (existingCourt.getLogoUrl() != null) {
-                    firebaseStorageService.deleteFile(existingCourt.getLogoUrl());
-                }
-                String newLogoPath = firebaseStorageService.uploadFile(courtRequest.getLogoUrl(), "courts/" + existingCourt.getId() + "/logo");
-                existingCourt.setLogoUrl(newLogoPath);
-            }
-
-            if (courtRequest.getBackgroundUrl() != null && !courtRequest.getBackgroundUrl().isEmpty()) {
-                if (existingCourt.getBackgroundUrl() != null) {
-                    firebaseStorageService.deleteFile(existingCourt.getBackgroundUrl());
-                }
-                String newBgPath = firebaseStorageService.uploadFile(courtRequest.getBackgroundUrl(), "courts/" + existingCourt.getId() + "/background");
-                existingCourt.setBackgroundUrl(newBgPath);
-            }
-
-            Court updatedCourt = courtRepository.save(existingCourt);
-            bookingSlotService.deleteBookingSlotsByCourtId(updatedCourt.getId());
-            return courtMapper.courtToCourtResponse(updatedCourt);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
+        courtMapper.updateCourt(existingCourt, courtRequest);
+        Court updatedCourt = courtRepository.save(existingCourt);
+        bookingSlotService.deleteBookingSlotsByCourtId(updatedCourt.getId());
+        return courtMapper.courtToCourtResponse(updatedCourt);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

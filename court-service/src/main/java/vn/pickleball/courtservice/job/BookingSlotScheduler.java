@@ -31,7 +31,7 @@ public class BookingSlotScheduler {
     // Chạy job mỗi 30 phút
     @Scheduled(cron = "0 0/30 * * * ?") // 30 phút
     public void checkAndLockExpiredSlots() {
-        log.info("Execute job");
+        log.info("Execute job lock slot");
         LocalDate currentDate = LocalDate.now();
         LocalTime currentTime = LocalTime.now();
 

@@ -69,8 +69,9 @@ public class CourtSlotController {
     }
 
     @PostMapping("/create-maintenance")
-    public void addMaintenanceHistory(@RequestBody CourtMaintenanceHistoryRequestDTO dto) {
+    public ResponseEntity<String> addMaintenanceHistory(@RequestBody CourtMaintenanceHistoryRequestDTO dto) {
         maintenanceHistoryService.addMaintenanceHistory(dto);
+        return ResponseEntity.ok("Create maintenance successfully");
     }
 
     @GetMapping("/maintenance-history")
@@ -78,8 +79,9 @@ public class CourtSlotController {
         return maintenanceHistoryService.getHistoriesByCourtSlotId(courtSlotId);
     }
 
-    @PutMapping("/finish-maintenance")
-    public void finishMaintenance(@RequestParam String maintenanceHistoryId) {
-        maintenanceHistoryService.finishMaintenance(maintenanceHistoryId);
+    @PutMapping("/update-maintenance")
+    public ResponseEntity<String> updateMaintenanceHistory(@RequestBody CourtMaintenanceHistoryRequestDTO dto) {
+        maintenanceHistoryService.updateMaintenanceHistory(dto);
+        return ResponseEntity.ok("Update maintenance successfully");
     }
 }

@@ -11,6 +11,7 @@ import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtPriceMapper;
 import vn.pickleball.courtservice.mapper.TimeSlotMapper;
 import vn.pickleball.courtservice.model.WeekType;
+import vn.pickleball.courtservice.model.request.BookingPaymentRequest;
 import vn.pickleball.courtservice.model.request.CourtPriceRequest;
 import vn.pickleball.courtservice.model.request.TimeSlotRequest;
 import vn.pickleball.courtservice.model.response.CourtPriceResponse;
@@ -19,6 +20,10 @@ import vn.pickleball.courtservice.repository.CourtPriceRepository;
 import vn.pickleball.courtservice.repository.CourtRepository;
 import vn.pickleball.courtservice.repository.TimeSlotRepository;
 
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -187,5 +192,59 @@ public class CourtPriceService {
         response.setWeekendTimeSlots(weekendTimeSlots);
 
         return response;
+    }
+
+    public BigDecimal calculateTotalPayment(BookingPaymentRequest request) {
+        BigDecimal totalPayment = BigDecimal.ZERO;
+
+        // Lấy bảng giá cho sân
+        CourtPriceResponse courtPrice = this.getCourtPriceByCourtId(request.getCourtId());
+
+        for (LocalDate date : request.getBookingDates()) {
+            boolean isWeekend = isWeekend(date);
+
+            // Nếu weekendTimeSlots == null, thì coi như weekday
+            List<TimeSlotResponse> applicableTimeSlots =
+                    (isWeekend && courtPrice.getWeekendTimeSlots() != null)
+                            ? courtPrice.getWeekendTimeSlots()
+                            : courtPrice.getWeekdayTimeSlots();
+
+            totalPayment = totalPayment.add(
+                    calculatePriceForDate(request.getStartTime(), request.getEndTime(), applicableTimeSlots)
+            );
+        }
+
+        return totalPayment;
+    }
+
+    private BigDecimal calculatePriceForDate(LocalTime startTime, LocalTime endTime, List<TimeSlotResponse> timeSlots) {
+        BigDecimal total = BigDecimal.ZERO;
+        List<LocalTime> timeIntervals = splitInto30MinSlots(startTime, endTime);
+
+        for (LocalTime time : timeIntervals) {
+            for (TimeSlotResponse slot : timeSlots) {
+                if (!time.isBefore(slot.getStartTime()) && time.isBefore(slot.getEndTime())) {
+                    total = total.add(slot.getRegularPrice());
+                    break;
+                }
+            }
+        }
+
+        return total;
+    }
+
+    private boolean isWeekend(LocalDate date) {
+        DayOfWeek day = date.getDayOfWeek();
+        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+    }
+
+    private List<LocalTime> splitInto30MinSlots(LocalTime startTime, LocalTime endTime) {
+        List<LocalTime> timeSlots = new ArrayList<>();
+        LocalTime currentTime = startTime;
+        while (!currentTime.isAfter(endTime.minusMinutes(1))) {
+            timeSlots.add(currentTime);
+            currentTime = currentTime.plusMinutes(30);
+        }
+        return timeSlots;
     }
 }

@@ -117,8 +117,8 @@ public class BookingSlotService {
             // Thêm vào kết quả
             bookingSlotsByCourtSlot.add(courtSlotBookingResponse);
         }
-        this.synchronousBooked(bookingSlotsByCourtSlot,courtId,dateBooking);
         this.lockSlotsByMaintenance(bookingSlotsByCourtSlot,courtId,dateBooking);
+        this.synchronousBooked(bookingSlotsByCourtSlot,courtId,dateBooking);
         // Tính thời gian hết hạn cho Redis (24h của ngày được chọn trừ cho ngày hiện tại)
         long expireTime = calculateExpireTime(dateBooking);
         if(expireTime > 0) {

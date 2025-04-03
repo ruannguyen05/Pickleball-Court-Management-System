@@ -3,7 +3,6 @@ package vn.pickleball.courtservice.entity;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.UuidGenerator;
 
 import java.util.List;
 
@@ -50,4 +49,8 @@ public class Court extends BaseEntity{
     @OneToMany(mappedBy = "court")
     @JsonManagedReference
     private List<CourtImage> courtImages;
+
+    @OneToMany(mappedBy = "court", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<CourtServiceEntity> courtServices;
 }

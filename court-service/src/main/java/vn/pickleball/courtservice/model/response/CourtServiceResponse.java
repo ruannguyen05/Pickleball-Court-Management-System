@@ -1,2 +1,18 @@
-package vn.pickleball.courtservice.model.response;public class CourtServiceResponse {
+package vn.pickleball.courtservice.model.response;
+
+import lombok.Data;
+
+@Data
+public class CourtServiceResponse {
+    private String id;
+    private String courtId;
+    private String category;
+    private String name;
+    private Double price;
+    private Integer quantity;
+    private String unit;
+    private String description;
+    private String imageUrl;
+    private boolean isActive;
+    private Integer soldCount;
 }
