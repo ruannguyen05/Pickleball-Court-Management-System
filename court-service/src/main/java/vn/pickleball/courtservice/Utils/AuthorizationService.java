@@ -29,7 +29,7 @@ public class AuthorizationService {
                 .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("MANAGER"));
 
         if (isManager) {
-            String userId = authentication.getName();
+            String userId = SecurityContextUtil.getUid();
             return courtRepository.findById(courtId)
                     .map(court -> court.getManagerId().equals(userId))
                     .orElse(false);

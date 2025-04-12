@@ -131,4 +131,8 @@ public class CourtService {
                 .data(responses)
                 .build();
     }
+
+    public List<String> getAllCourtIds() {
+        return courtRepository.findAllCourtIds();
+    }
 }

@@ -4,12 +4,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtImage;
-import vn.pickleball.courtservice.model.request.BookingPaymentRequest;
-import vn.pickleball.courtservice.model.request.CourtServicePurchaseRequest;
-import vn.pickleball.courtservice.model.request.CourtSlotRequest;
-import vn.pickleball.courtservice.model.request.UpdateBookingSlot;
+import vn.pickleball.courtservice.model.request.*;
 import vn.pickleball.courtservice.model.response.CourtPriceResponse;
 import vn.pickleball.courtservice.model.response.CourtServiceResponse;
 import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
@@ -19,8 +15,6 @@ import vn.pickleball.courtservice.service.*;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +27,7 @@ public class PublicController {
     private final BookingSlotService bookingSlotService;
     private final CourtImageService courtImageService;
     private final CourtService_Service courtServiceService;
+    private final CourtService courtService;
     private final CourtMaintenanceHistoryService maintenanceHistoryService;
     private final FirebaseStorageService firebaseStorageService;
 
@@ -99,21 +94,17 @@ public class PublicController {
     }
 
     @PostMapping("/service/purchase")
-    public ResponseEntity<?> purchaseUpdate(@RequestBody List<CourtServicePurchaseRequest> requests) {
+    public ResponseEntity<Void> purchaseUpdate(@RequestBody List<CourtServicePurchaseRequest> requests) {
         courtServiceService.updateAfterPurchase(requests);
-        return ResponseEntity.ok("Purchase update successful");
+        return ResponseEntity.ok().build();
     }
 
 
-    @GetMapping("/check-maintenance-slots")
-    public ResponseEntity<Map<String, List<LocalDate>>> getInvalidCourtSlots(
-            @RequestParam String courtId,
-            @RequestParam List<LocalDate> bookingDates,
-            @RequestParam LocalTime startTime,
-            @RequestParam LocalTime endTime) {
+    @PostMapping("/check-maintenance-slots")
+    public ResponseEntity<Map<String, List<LocalDate>>> getInvalidCourtSlots(@RequestBody CheckValidMaintenance request) {
 
         Map<String, List<LocalDate>> invalidCourtSlots = maintenanceHistoryService.getMaintenanceCourtSlots(
-                courtId, bookingDates, startTime, endTime);
+                request.getCourtId(), request.getBookingDates(), request.getStartTime(), request.getEndTime());
         return ResponseEntity.ok(invalidCourtSlots);
     }
 
@@ -143,5 +134,11 @@ public class PublicController {
     @PostMapping("/synchronous")
     public void synchronous(@RequestParam String courtId){
         bookingSlotService.deleteBookingSlotsByCourtId(courtId);
+    }
+
+    @GetMapping("/court/ids")
+    public ResponseEntity<List<String>> getCourtIds() {
+        List<String> courtIds = courtService.getAllCourtIds();
+        return ResponseEntity.ok(courtIds);
     }
 }

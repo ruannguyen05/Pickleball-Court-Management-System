@@ -2,8 +2,10 @@ package vn.pickleball.courtservice.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtServiceEntity;
+import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtServiceMapper;
 import vn.pickleball.courtservice.model.request.CourtServicePurchaseRequest;
 import vn.pickleball.courtservice.model.request.CourtServiceRequest;
@@ -11,6 +13,7 @@ import vn.pickleball.courtservice.model.response.CourtServiceResponse;
 import vn.pickleball.courtservice.repository.CourtRepository;
 import vn.pickleball.courtservice.repository.CourtServiceRepository;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +23,7 @@ public class CourtService_Service {
     private final CourtRepository courtRepository;
     private final CourtServiceRepository courtServiceRepository;
     private final CourtServiceMapper courtServiceMapper;
+    private final FirebaseStorageService firebaseStorageService;
 
     public CourtServiceResponse createCourtService(CourtServiceRequest request) {
         Court court = courtRepository.findById(request.getCourtId())
@@ -71,6 +75,20 @@ public class CourtService_Service {
 
             courtServiceRepository.save(courtService);
         });
+    }
+
+    public void uploadImage (String id, MultipartFile file){
+        CourtServiceEntity courtService = courtServiceRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("CourtService not found"));
+        if (courtService.getImageUrl() != null) {
+            firebaseStorageService.deleteFile(courtService.getImageUrl());
+        }
+
+        try {
+            firebaseStorageService.uploadFile(file, "courts/" + courtService.getCourt().getId() + "/services");
+        } catch (IOException e) {
+            throw new ApiException("Upload service image fail","UPLOAD_FAIL");
+        }
     }
 
 }
