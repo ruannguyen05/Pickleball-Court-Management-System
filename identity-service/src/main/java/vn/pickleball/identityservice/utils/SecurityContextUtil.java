@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.Utils;
+package vn.pickleball.identityservice.utils;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -17,6 +17,19 @@ public class SecurityContextUtil {
 
     public static String getUid(){
         return getClaim("uid");
+    }
+
+    public static boolean isManager(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+
+    public static boolean isStaff(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF"));
     }
 
     public static String getUsername() {

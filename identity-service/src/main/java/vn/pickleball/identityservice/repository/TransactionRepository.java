@@ -29,25 +29,41 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
                                        @Param("endDate") LocalDateTime endDate,
                                        Pageable pageable);
 
+    @Query("SELECT t FROM Transaction t WHERE (:paymentStatus IS NULL OR t.paymentStatus = :paymentStatus) " +
+            "AND (:courtId IS NULL OR t.courtId = :courtId) " +
+            "AND (:orderId IS NULL OR t.order.id = :orderId) " +
+            "AND (:startDate IS NULL OR t.createDate >= :startDate) " +
+            "AND (:endDate IS NULL OR t.createDate <= :endDate)")
+    List<Transaction> findTransactionsByFilters(@Param("paymentStatus") String paymentStatus,
+                                       @Param("courtId") String courtId,
+                                       @Param("orderId") String orderId,
+                                       @Param("startDate") LocalDateTime startDate,
+                                       @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.paymentStatus <> 'Hoàn tiền' " +
             "AND (:courtId IS NULL OR t.courtId = :courtId) " +
+            "AND (:orderId IS NULL OR t.order.id = :orderId) " +
             "AND (:startDate IS NULL OR t.createDate >= :startDate) " +
             "AND (:endDate IS NULL OR t.createDate <= :endDate)")
     BigDecimal getTotalAmountExcludingRefund(@Param("courtId") String courtId,
+                                             @Param("orderId") String orderId,
                                              @Param("startDate") LocalDateTime startDate,
                                              @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.paymentStatus = 'Hoàn tiền' " +
             "AND (:courtId IS NULL OR t.courtId = :courtId) " +
+            "AND (:orderId IS NULL OR t.order.id = :orderId) " +
             "AND (:startDate IS NULL OR t.createDate >= :startDate) " +
             "AND (:endDate IS NULL OR t.createDate <= :endDate)")
     BigDecimal getTotalRefundAmount(@Param("courtId") String courtId,
+                                    @Param("orderId") String orderId,
                                     @Param("startDate") LocalDateTime startDate,
                                     @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT t FROM Transaction t WHERE t.order.id = :orderId ORDER BY t.createDate DESC")
     List<Transaction> findByOrderId(@Param("orderId") String orderId);
 
-
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE t.order.id IN :orderIds AND t.paymentStatus = 'Hoàn tiền'")
+    BigDecimal sumRefundAmountByOrderIds(@Param("orderIds") List<String> orderIds);
 }

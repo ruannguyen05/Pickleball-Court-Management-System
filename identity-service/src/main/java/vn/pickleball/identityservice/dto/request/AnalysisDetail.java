@@ -1,14 +1,19 @@
 package vn.pickleball.identityservice.dto.request;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class AnalysisDetail {
     private String dayOfWeek;
 
-    private Integer totalSlots;
+    private String timeRange;
 
-    private Integer bookedSlots;
+    private int totalSlots;
 
-    private Double occupancyRate;
+    private int bookedSlots;
+    private double occupancyRate;
 }

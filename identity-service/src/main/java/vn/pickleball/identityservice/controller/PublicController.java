@@ -8,10 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vn.pickleball.identityservice.dto.payment.MbVietQrRefundWithAmountRequest;
 import vn.pickleball.identityservice.dto.request.*;
-import vn.pickleball.identityservice.dto.response.FixedBookingResponse;
-import vn.pickleball.identityservice.dto.response.NotificationResponse;
-import vn.pickleball.identityservice.dto.response.OrderResponse;
-import vn.pickleball.identityservice.dto.response.PaymentData;
+import vn.pickleball.identityservice.dto.response.*;
 import vn.pickleball.identityservice.service.EmailService;
 import vn.pickleball.identityservice.service.FCMService;
 import vn.pickleball.identityservice.service.NotificationService;
@@ -130,19 +127,15 @@ public class PublicController {
         return GenerateString.encode(totalAmount,paymentAmount,depositAmount, bookingDate);
     }
 
-    @GetMapping("/check-invalid-slots")
+    @PostMapping("/check-invalid-slots")
     public ResponseEntity<Map<String, Object>> checkInvalidCourtSlots(
-            @RequestParam String courtId,
-            @RequestParam String daysOfWeek, // "MONDAY,TUESDAY"
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime startTime,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime endTime) {
+            @RequestBody CheckValidFixed request) {
 
-        List<LocalDate> bookingDates = orderService.getBookingDatesFromDaysOfWeek(startDate, endDate, daysOfWeek);
+        List<LocalDate> bookingDates = orderService.getBookingDatesFromDaysOfWeek(request.getStartDate(),
+                request.getEndDate(), request.getDaysOfWeek());
 
         Map<String, Object> response = orderService.getInvalidCourtSlots(
-                courtId, bookingDates, startTime, endTime);
+                request.getCourtId(), bookingDates, request.getStartTime(), request.getEndTime());
         return ResponseEntity.ok(response);
     }
 
@@ -164,6 +157,27 @@ public class PublicController {
     public ResponseEntity<OrderResponse> createFixedBooking(@RequestBody @Valid FixedBookingRequest request) {
         OrderResponse response = orderService.createFixedBooking(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/paymentOrder")
+    public ResponseEntity<String> paymentOrder(@RequestParam String orderId) {
+        return ResponseEntity.ok(orderService.createPaymentOrder(orderId));
+    }
+
+    @PostMapping("/noti/maintenance")
+    public ResponseEntity<String> sendMaintenanceNotification(@RequestParam String courtId, @RequestParam String courtSlotId) {
+        orderService.sendNotiMaintenance(courtId, courtSlotId);
+        return ResponseEntity.ok("Maintenance notification sent successfully");
+    }
+
+    @PostMapping("/order/service")
+    public ResponseEntity<OrderResponse> orderService(@RequestBody OrderServiceRequest request){
+        return ResponseEntity.ok(orderService.createServiceOrder(request));
+    }
+
+    @GetMapping("/getTransactionHistory")
+    public List<TransactionHistory> getTransactionHistory(@RequestParam String orderId){
+        return orderService.getTransactionHistory(orderId);
     }
 
 }

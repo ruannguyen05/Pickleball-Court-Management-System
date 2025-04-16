@@ -2,24 +2,42 @@ package vn.pickleball.identityservice.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import vn.pickleball.identityservice.dto.request.NotiData;
 import vn.pickleball.identityservice.dto.request.NotificationRequest;
 import vn.pickleball.identityservice.dto.response.NotificationResponse;
 import vn.pickleball.identityservice.entity.Notification;
+import vn.pickleball.identityservice.entity.Order;
+import vn.pickleball.identityservice.entity.OrderDetail;
 import vn.pickleball.identityservice.entity.User;
 import vn.pickleball.identityservice.mapper.NotificationMapper;
+import vn.pickleball.identityservice.mapper.OrderMapper;
 import vn.pickleball.identityservice.repository.NotificationRepository;
+import vn.pickleball.identityservice.repository.OrderRepository;
 import vn.pickleball.identityservice.repository.UserRepository;
 
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
     private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
+    private final FCMService fcmService;
+    private final OrderMapper orderMapper;
+    private final EmailService emailService;
 
     // Lưu thông báo mới
     public NotificationRequest saveNotification(NotificationRequest request, String phoneNumber) {
@@ -67,4 +85,76 @@ public class NotificationService {
     public Long courtUnRead(String value){
         return notificationRepository.countUnreadByIdOrPhoneNumber(value);
     }
+
+    public void checkAndSendUpcomingBookingNotifications() {
+        // 1. Lấy ngày hiện tại
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        // 2. Tìm các đơn hàng thỏa điều kiện
+        List<Order> orders = orderRepository.findByOrderStatusInAndBookingDate(
+                Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công"),
+                today
+        );
+
+        // 3. Xử lý từng đơn hàng
+        if (orders != null && !orders.isEmpty()) {
+            for (Order order : orders) {
+                processOrderForNotifications(order, now);
+            }
+        }
+    }
+
+    private void processOrderForNotifications(Order order, LocalTime now) {
+        // 1. Lọc các chi tiết đặt sân của hôm nay
+        List<OrderDetail> todaysDetails = order.getOrderDetails().stream()
+                .filter(od -> od.getBookingDates().stream()
+                        .anyMatch(bd -> bd.getBookingDate().equals(LocalDate.now())))
+                .toList();
+
+        // 2. Tìm chi tiết sớm nhất trong 30 phút tới
+        Optional<OrderDetail> upcomingDetail = todaysDetails.stream()
+                .filter(od -> {
+                    Duration duration = Duration.between(now, od.getStartTime());
+                    return !duration.isNegative() && duration.toMinutes() <= 30;
+                })
+                .min(Comparator.comparing(OrderDetail::getStartTime));
+
+        // 3. Gửi thông báo nếu có
+        upcomingDetail.ifPresent(orderDetail -> sendUpcomingBookingNotification(order, orderDetail));
+    }
+
+    private void sendUpcomingBookingNotification(Order order, OrderDetail detail) {
+        String title = "Bạn có lịch đặt sân sắp tới giờ";
+        String description = String.format(
+                "Bạn có lịch đặt sân %s sử dụng lúc %s",
+                order.getCourtName(),
+                detail.getStartTime()
+        );
+        sendNoti(title, description, order);
+
+        if (order.getUser() != null) {
+            String email = order.getUser().getEmail();
+            if (email != null) {
+                emailService.sendBookingRemindEmail(email, orderMapper.toOrderResponse(order));
+            }
+        }
+    }
+
+    public void sendNoti(String title, String des, Order order) {
+        List<String> fcmTokens = order.getUser() != null ? fcmService.getTokens(order.getUser().getId()) : fcmService.getTokens(order.getPhoneNumber());
+        if (fcmTokens == null || fcmTokens.isEmpty()) fcmTokens = fcmService.getTokens(order.getPhoneNumber());
+        NotificationRequest notificationRequest = NotificationRequest.builder()
+                .title(title)
+                .description(des)
+                .createAt(LocalDateTime.now())
+                .status("send")
+                .notificationData(NotiData.builder()
+                        .orderId(order.getId())
+                        .build())
+                .build();
+        NotificationRequest notification = this.saveNotification(notificationRequest, order.getPhoneNumber());
+        fcmService.sendNotification(fcmTokens, notification);
+    }
+
 }

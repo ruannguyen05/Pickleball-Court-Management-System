@@ -47,9 +47,22 @@ public class UserController {
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String phoneNumber,
             @RequestParam(required = false) String email,
+            @RequestParam(required = false) String roleName,
+            @RequestParam(required = false) String courtId
+    ) {
+        return ResponseEntity.ok(userService.getUsers(page, size, username, phoneNumber, email, roleName, courtId));
+    }
+
+    @GetMapping("/getUsersByManager")
+    public ResponseEntity<PagedUserResponse> getUsersManager(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String username,
+            @RequestParam(required = false) String phoneNumber,
+            @RequestParam(required = false) String email,
             @RequestParam(required = false) String roleName
     ) {
-        return ResponseEntity.ok(userService.getUsers(page, size, username, phoneNumber, email, roleName));
+        return ResponseEntity.ok(userService.getUsersManager(page, size, username, phoneNumber, email, roleName));
     }
 
     @GetMapping("/getUsersWithRole")

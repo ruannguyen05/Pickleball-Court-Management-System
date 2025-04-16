@@ -69,11 +69,50 @@ public class EmailService {
             mailSender.send(message);
         } catch (MessagingException e) {
             log.error("Send mail error to - {}", to);
-            throw new RuntimeException(e);
+//            throw new RuntimeException(e);
         }
     }
 
 
+    @Async
+    public void sendBookingRemindEmail(String to, OrderResponse orderResponse) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject("⏰ Nhắc nhở lịch đặt sân!");
+
+            // Load template và truyền dữ liệu vào
+            Context context = new Context();
+            context.setVariable("customerName", orderResponse.getCustomerName());
+            context.setVariable("courtName", orderResponse.getCourtName());
+            context.setVariable("address", orderResponse.getAddress());
+
+            // Nhóm các OrderDetailResponse theo courtSlotName
+            Map<String, List<OrderDetailResponse>> groupedByCourtSlot = new LinkedHashMap<>();
+            for (OrderDetailResponse detail : orderResponse.getOrderDetails()) {
+                groupedByCourtSlot
+                        .computeIfAbsent(detail.getCourtSlotName(), k -> new ArrayList<>())
+                        .add(detail);
+            }
+
+            context.setVariable("groupedByCourtSlot", groupedByCourtSlot);
+            context.setVariable("totalAmount", formatCurrency(orderResponse.getTotalAmount()));
+            context.setVariable("amountPaid",
+                    orderResponse.getAmountPaid() != null ? formatCurrency(orderResponse.getAmountPaid()) : "Chưa thanh toán"
+            );
+
+            // Render email từ template
+            String htmlContent = templateEngine.process("order-remind", context);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+        } catch (MessagingException e) {
+            log.error("Send mail error to - {}", to);
+//            throw new RuntimeException(e);
+        }
+    }
 
 
 

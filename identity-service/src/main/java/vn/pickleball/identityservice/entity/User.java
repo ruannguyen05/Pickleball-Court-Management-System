@@ -54,6 +54,11 @@ public class User extends BaseEntity{
     private String courtId;
 
     @ManyToMany
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "roles_name")
+    )
     Set<Role> roles;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)

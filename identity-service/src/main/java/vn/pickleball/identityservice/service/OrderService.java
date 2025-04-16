@@ -4,10 +4,14 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -21,16 +25,14 @@ import vn.pickleball.identityservice.dto.payment.CreateQrRequest;
 import vn.pickleball.identityservice.dto.payment.MbVietQrRefundWithAmountRequest;
 import vn.pickleball.identityservice.dto.payment.NotificationResponse;
 import vn.pickleball.identityservice.dto.request.*;
-import vn.pickleball.identityservice.dto.response.FixedBookingResponse;
-import vn.pickleball.identityservice.dto.response.FixedResponse;
-import vn.pickleball.identityservice.dto.response.MbQrCodeResponse;
-import vn.pickleball.identityservice.dto.response.OrderResponse;
+import vn.pickleball.identityservice.dto.response.*;
 import vn.pickleball.identityservice.entity.*;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.OrderMapper;
 import vn.pickleball.identityservice.mapper.TransactionMapper;
 import vn.pickleball.identityservice.repository.*;
 import vn.pickleball.identityservice.utils.GenerateString;
+import vn.pickleball.identityservice.utils.SecurityContextUtil;
 import vn.pickleball.identityservice.websockethandler.NotificationWebSocketHandler;
 
 import javax.crypto.Mac;
@@ -84,11 +86,11 @@ public class OrderService {
     private String checkSum;
 
     public OrderResponse createOrder(OrderRequest request) {
-        if(!GenerateString.isValidSignature(request.getTotalAmount().toString(),
+        if (!GenerateString.isValidSignature(request.getTotalAmount().toString(),
                 request.getPaymentAmount().toString(),
                 request.getDepositAmount().toString(),
                 request.getPhoneNumber(),
-                request.getSignature())){
+                request.getSignature())) {
             throw new ApiException("Payment amount not match", "AMOUNT_NOT_MATCH");
         }
 
@@ -100,7 +102,7 @@ public class OrderService {
         order.setDepositAmount(request.getDepositAmount());
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn ngày");
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa đặt cọc");
-        if(request.getUserId() != null && !request.getUserId().isEmpty()){
+        if (request.getUserId() != null && !request.getUserId().isEmpty()) {
             order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> null));
         }
 //        LocalTime latestEndTime = Collections.max(request.getOrderDetails(),
@@ -312,7 +314,7 @@ public class OrderService {
         }
     }
 
-    private void deleteOldOrderDetail(Order order){
+    private void deleteOldOrderDetail(Order order) {
         orderDetailRepository.deleteAll(order.getOrderDetails());
         orderRepository.save(order);
     }
@@ -345,12 +347,17 @@ public class OrderService {
                 .resDesc("Not payment")
                 .resCode("400")
                 .build());
+
+
         String orderStatus = order.getOrderStatus().equals("Thay đổi lịch đặt") ? "Đổi lịch thất bại" : "Hủy đặt lịch do quá giờ thanh toán";
 
         order.setOrderStatus(orderStatus);
         orderRepository.save(order);
-        sendNoti(orderStatus.toUpperCase(),"Lịch của bạn đã bị hủy do quá thời gian chờ thanh toán.", order );
-
+        if (order.getOrderStatus().equals("Đặt lịch thành công") || order.getOrderType().equals("Đơn dịch vụ")) {
+            sendNoti("Thanh toán thất bại", "Đã hết thời gian chờ thanh toán, vui lòng kiểm tra lại đặt lịch.", order);
+        } else {
+            sendNoti(orderStatus.toUpperCase(), "Lịch của bạn đã bị hủy do quá thời gian chờ thanh toán.", order);
+        }
         log.info("Order {} has been cancelled due to payment timeout.", order.getId());
         log.info("Update order status");
         // Cập nhật trạng thái sân
@@ -376,12 +383,16 @@ public class OrderService {
             BigDecimal amount = new BigDecimal(response.getData().getDebitAmount());
             TransactionRequest transactionRequest = getTransactionRedis(response.getData().getReferenceLabelCode());
             Order order = orderRepository.findById(transactionRequest.getOrderId()).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
-
-            String orderStatus = order.getOrderStatus().equals("Thay đổi lịch đặt") ? "Thay đổi lịch đặt thành công" : "Đặt lịch thành công";
-            order.setOrderStatus(orderStatus);
+            String orderStatus = order.getOrderStatus();
+            if(order.getOrderType().equals("Đơn dịch vụ")) {
+                orderStatus = orderStatus + " thành công";
+            }else {
+                orderStatus = order.getOrderStatus().equals("Thay đổi lịch đặt") ? "Thay đổi lịch đặt thành công" : "Đặt lịch thành công";
+            }
             String paymentStatus = order.getPaymentStatus().equals("Chưa đặt cọc") ? "Đã đặt cọc" : "Đã thanh toán";
+            order.setOrderStatus(orderStatus);
             order.setPaymentStatus(paymentStatus);
-            order.setAmountPaid(order.getAmountPaid() != null ? order.getAmountPaid().add(amount)  : amount);
+            order.setAmountPaid(order.getAmountPaid() != null ? order.getAmountPaid().add(amount) : amount);
             orderRepository.save(order);
             socketHandler.sendNotification(NotificationResponse.builder()
                     .key(order.getId())
@@ -399,24 +410,32 @@ public class OrderService {
                     .courtId(order.getCourtId())
                     .build();
             transactionRepository.save(transaction);
-            if (order.getUser() != null) {
+            if (order.getUser() != null && !order.getOrderType().equals("Đơn cố định")) {
                 String email = order.getUser().getEmail();
                 if (email != null) {
-//                try {
                     emailService.sendBookingConfirmationEmail(email, orderMapper.toOrderResponse(order));
-//                } catch (MessagingException e) {
-//                    log.error("Send email to {} error - message - {}" , email, e.getMessage());
-//                }
                 }
             }
 
-            if(order.getOrderType().equals("Đơn cố định")){
+            if (order.getOrderType().equals("Đơn cố định")) {
                 courtClient.synchronous(order.getCourtId());
             }
-
-            sendNoti(orderStatus.toUpperCase(), "Cảm ơn bạn đã đặt lịch , vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
-            sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có lịch đặt mới hãy kiểm tra lịch đặt của khách", order);
+            if (order.getOrderStatus().equals("Thay đổi lịch đặt thành công")) {
+                sendNoti(orderStatus.toUpperCase(), "Thanh toán đặt lịch thành công, vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
+            } else if (order.getOrderType().equals("Đơn dịch vụ")) {
+                try {
+                    List<ServiceDetailEntity> serviceDetailEntities = order.getServiceDetails();
+                    courtClient.updateAfterPurchase(orderMapper.toPurchaseRequestList(serviceDetailEntities));
+                }catch (FeignException e){
+                    throw new ApiException("Fail to update quantity", "ERROR_UPDATE_QUANTITY");
+                }
+                sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có đơn đặt mới của khách , kiểm tra yêu cầu của khách", order);
+            } else {
+                sendNoti(orderStatus.toUpperCase(), "Cảm ơn bạn đã đặt lịch , vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
+                sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có lịch đặt mới hãy kiểm tra lịch đặt của khách", order);
+            }
             deleteTransactionRedis(response.getData().getReferenceLabelCode());
+            redisTemplate.delete(PREFIX_QR + order.getId());
         } catch (Exception e) {
             throw new ApiException("NOTIFY_PAYMENT_FAIL", "Fail on process in payment service!");
         }
@@ -461,9 +480,9 @@ public class OrderService {
 //        deleteTransactionRedis(paymentData.getBillCode());
 //    }
 
-    public void sendNoti(String title, String des, Order order){
-        List<String> fcmTokens = order.getUser() != null ?  fcmService.getTokens(order.getUser().getId()) : fcmService.getTokens(order.getPhoneNumber());
-        if(fcmTokens == null || fcmTokens.isEmpty()) fcmTokens = fcmService.getTokens(order.getPhoneNumber());
+    public void sendNoti(String title, String des, Order order) {
+        List<String> fcmTokens = order.getUser() != null ? fcmService.getTokens(order.getUser().getId()) : fcmService.getTokens(order.getPhoneNumber());
+        if (fcmTokens == null || fcmTokens.isEmpty()) fcmTokens = fcmService.getTokens(order.getPhoneNumber());
         NotificationRequest notificationRequest = NotificationRequest.builder()
                 .title(title)
                 .description(des)
@@ -490,6 +509,28 @@ public class OrderService {
                     .status("send")
                     .notificationData(NotiData.builder()
                             .orderId(order.getId())
+                            .build())
+                    .build();
+
+            NotificationRequest notification = notificationService.saveNotificationManagerAndStaff(notificationRequest, user);
+
+            fcmService.sendNotification(fcmTokens, notification);
+        }
+    }
+
+    public void sendNotiMaintenance(String courtId, String courtSlotId) {
+        List<User> users = userRepository.findByCourtId(courtId);
+
+        for (User user : users) {
+            List<String> fcmTokens = fcmService.getTokens(user.getId());
+
+            NotificationRequest notificationRequest = NotificationRequest.builder()
+                    .title("Kiểm tra lịch bảo trì")
+                    .description("Đến lịch bảo trì , kiểm tra lịch bảo trì")
+                    .createAt(LocalDateTime.now())
+                    .status("send")
+                    .notificationData(NotiData.builder()
+                            .orderId(courtSlotId)
                             .build())
                     .build();
 
@@ -560,7 +601,8 @@ public class OrderService {
             String key = PREFIX + billCode;
             String value = redisTemplate.opsForValue().get(key);
             if (value != null) {
-                return redisObjectMapper.readValue(value, new TypeReference<List<UpdateBookingSlot>>() {});
+                return redisObjectMapper.readValue(value, new TypeReference<List<UpdateBookingSlot>>() {
+                });
             }
             return Collections.emptyList(); // Trả về danh sách rỗng nếu không tìm thấy
         } catch (JsonProcessingException e) {
@@ -576,25 +618,27 @@ public class OrderService {
         return orderMapper.toOrderResponses(orders);
     }
 
-    public OrderResponse getOrderById (String oid){
-        OrderResponse response =  orderMapper.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
+    public OrderResponse getOrderById(String oid) {
+        OrderResponse response = orderMapper.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
         response.setQrcode(redisTemplate.opsForValue().get(PREFIX_QR + oid));
         return response;
     }
 
-    public OrderResponse cancelOrder(String orderId){
+    public OrderResponse cancelOrder(String orderId) {
         Order order = orderRepository.findById(orderId).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
 
 //        if(order.getPaymentTimeout().isAfter(LocalDateTime.now())){
 //            throw  new ApiException("Order was timeout", "ORDER_TIMEOUT");
 //        }
 
+        if(order.getOrderStatus().equals("Đã sử dụng lịch đặt")) throw new ApiException("Không thể hủy lịch vì đã sử dụng dịch vụ", "ORDER_INVALID");
+
         order.setOrderStatus("Hủy đặt lịch");
         order.setPaymentStatus(order.getPaymentStatus().equals("Chưa đặt cọc") ? "Chưa đặt cọc" : order.getPaymentStatus());
-        if(order.getAmountPaid() != null && order.getAmountPaid().compareTo(order.getDepositAmount()) > 0){
+        if (order.getAmountPaid() != null && order.getAmountPaid().compareTo(order.getDepositAmount()) > 0) {
             try {
                 processRefund(order, order.getPaymentAmount().subtract(order.getDepositAmount()));
-            }catch (Exception e){
+            } catch (Exception e) {
                 throw new ApiException("Refund error", "REFUND_ERROR");
             }
         }
@@ -613,12 +657,12 @@ public class OrderService {
         }
         orderRepository.save(order);
         sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
-        sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT" ,"Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
+        sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
         deleteTransactionRedis(order.getBillCode());
         return orderMapper.toOrderResponse(order);
     }
 
-    public void testFcm(String key){
+    public void testFcm(String key) {
         NotificationRequest notificationRequest = NotificationRequest.builder()
                 .title("test")
                 .description("test")
@@ -629,8 +673,8 @@ public class OrderService {
 
     }
 
-//    @PreAuthorize("hasRole('ADMIN')")
-    public void refund(MbVietQrRefundWithAmountRequest refundWithAmountRequest){
+    //    @PreAuthorize("hasRole('ADMIN')")
+    public void refund(MbVietQrRefundWithAmountRequest refundWithAmountRequest) {
         try {
             paymentClient.refund(refundWithAmountRequest, apiKey, clientId);
         } catch (FeignException e) {
@@ -639,24 +683,19 @@ public class OrderService {
     }
 
 
-
-
-
-    public UpdateBookingSlot getBookedSlot(String courtId , LocalDate bookingDate){
-        List<String> statuses = Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công");
-        List<Order> orders =  orderRepository.findByOrderStatusInAndCourtIdAndBookingDate(statuses, courtId, bookingDate);
-        if(orders==null ||orders.isEmpty() ){
+    public UpdateBookingSlot getBookedSlot(String courtId, LocalDate bookingDate) {
+        List<String> statuses = Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công" , "Đã hoàn thành" , "Đã sử dụng lịch đặt" , "Không sử dụng lịch đặt");
+        List<Order> orders = orderRepository.findByOrderStatusInAndCourtIdAndBookingDate(statuses, courtId, bookingDate);
+        if (orders == null || orders.isEmpty()) {
             return null;
         }
-        return orderMapper.mapToUpdateBookingSlot(orders,bookingDate);
+        return orderMapper.mapToUpdateBookingSlot(orders, bookingDate);
     }
 
 
-
-
-    public List<OrderDetail> getOrderDetailsByBookingDate(LocalDate bookingDate) {
-        return orderDetailRepository.findAllByBookingDate(bookingDate);
-    }
+//    public List<OrderDetail> getOrderDetailsByBookingDate(LocalDate bookingDate) {
+//        return orderDetailRepository.findAllByBookingDate(bookingDate);
+//    }
 
 //    public List<Order> getUnsettledOrders() {
 //        return orderRepository.findByOrderStatusNotAndPaymentStatusAndSettlementTimeLessThanEqual(
@@ -664,15 +703,17 @@ public class OrderService {
 //        );
 //    }
 
-    public List<Order> getOrderRefund(){
+    public List<Order> getOrderRefund() {
         return orderRepository.findByPaymentStatus("Đợi hoàn tiền");
     }
 
 
-
     public void refundByJob(Order order) {
         try {
-            processRefund(order, order.getAmountPaid().subtract(order.getDepositAmount()));
+            BigDecimal amountPaid = Optional.ofNullable(order.getAmountPaid()).orElse(BigDecimal.ZERO);
+            BigDecimal depositAmount = Optional.ofNullable(order.getDepositAmount()).orElse(BigDecimal.ZERO);
+
+            processRefund(order, amountPaid.subtract(depositAmount));
         } catch (ApiException e) {
             log.error("Refund error - {}", order.getId());
         }
@@ -680,9 +721,26 @@ public class OrderService {
     }
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
-    public void refundByAdmin(String orderId , BigDecimal refundAmount){
+    public void refundByAdmin(String orderId, BigDecimal refundAmount) {
         Order order = orderRepository.findById(orderId).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
-        processRefund(order , refundAmount);
+        if (refundAmount == null) {
+            BigDecimal amount = order.getAmountPaid().subtract(order.getDepositAmount());
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) throw new ApiException("Invalid amount", "REFUND_ERROR");
+            try {
+                processRefund(order, amount);
+            } catch (ApiException e) {
+                throw new ApiException("Refund error", "REFUND_ERROR");
+            }
+        } else {
+            if (refundAmount.compareTo(BigDecimal.ZERO) <= 0) throw new ApiException("Invalid amount", "REFUND_ERROR");
+            try {
+                processRefund(order, refundAmount);
+            } catch (ApiException e) {
+                throw new ApiException("Refund error", "REFUND_ERROR");
+            }
+        }
+
+
     }
 
     public void processRefund(Order order, BigDecimal refundAmount) {
@@ -757,7 +815,7 @@ public class OrderService {
         order.setPaymentStatus("Đã hoàn tiền");
         order.setAmountRefund(refundAmount);
         sendNoti("HOÀN TIỀN THÀNH CÔNG", "Chúng tôi đã hoàn " + refundAmount + ", vui lòng kiểm tra tài khoản.", order);
-        sendNotiManagerAndStaff("HOÀN TIỀN THÀNH CÔNG", "Kiểm tra đơn hàng và số tiền đã hoàn",order);
+        sendNotiManagerAndStaff("HOÀN TIỀN THÀNH CÔNG", "Kiểm tra đơn hàng và số tiền đã hoàn", order);
     }
 
 
@@ -844,7 +902,6 @@ public class OrderService {
     }
 
 
-
     public List<Transaction> findUniqueBillCodeTransactions(String orderId) {
         List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
 
@@ -870,11 +927,16 @@ public class OrderService {
                                                     LocalTime endTime) {
         // Lấy danh sách lịch bảo trì từ FeignClient
         Map<String, List<LocalDate>> maintenanceCourtSlots = courtClient.getInvalidCourtSlots(
-                courtId, bookingDates, startTime, endTime).getBody();
+                CheckValidMaintenance.builder()
+                        .courtId(courtId)
+                        .bookingDates(bookingDates)
+                        .startTime(startTime)
+                        .endTime(endTime)
+                        .build()).getBody();
 
         // Lấy danh sách lịch đã đặt từ orderRepository
         List<Object[]> bookedSlots = orderRepository.findBookedCourtSlots(
-                courtId, bookingDates, startTime, endTime, Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công"));
+                courtId, bookingDates, startTime, endTime, Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công", "Đã hoàn thành" , "Đã sử dụng lịch đặt" , "Không sử dụng lịch đặt"));
 
         // Kết hợp lịch bảo trì & lịch đã đặt vào invalidCourtSlots
         Map<String, List<LocalDate>> invalidCourtSlots = new HashMap<>();
@@ -907,7 +969,6 @@ public class OrderService {
     }
 
 
-
     /**
      * Lấy danh sách các ngày thuộc những thứ người dùng đã chọn trong khoảng startDate - endDate
      */
@@ -930,140 +991,430 @@ public class OrderService {
         return bookingDates;
     }
 
-//    @Transactional(propagation = Propagation.REQUIRES_NEW)
-public OrderResponse createFixedBooking(FixedBookingRequest request) {
-    // Tạo đơn hàng
-    Order order = new Order();
-    order.setCustomerName(request.getCustomerName());
-    order.setPhoneNumber(request.getPhoneNumber());
-    order.setCourtId(request.getCourtId());
-    order.setCourtName(request.getCourtName());
-    order.setAddress(request.getAddress());
-    order.setOrderStatus("Đang xử lý");
-    order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn cố định");
-    order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa thanh toán");
-    order.setNote(request.getNote());
-    if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-        order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new RuntimeException("User not found")));
-    }
-
-    // Lưu order trước để có ID
-    order = orderRepository.save(order);
-
-    // Prepare OrderDetails
-    List<LocalDate> bookingDates = getBookingDatesFromDaysOfWeek(
-            request.getStartDate(), request.getEndDate(), request.getSelectedDays()
-    );
-
-    List<OrderDetail> allOrderDetails = new ArrayList<>();
-
-    for (String courtSlotName : request.getSelectedCourtSlots()) {
-        String courtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), courtSlotName);
-
-        // Fixed dates
-        List<LocalDate> fixedDates = bookingDates.stream()
-                .filter(date -> request.getFlexibleCourtSlotFixes() == null ||
-                        !request.getFlexibleCourtSlotFixes().containsKey(date.toString()))
-                .collect(Collectors.toList());
-
-        if (!fixedDates.isEmpty()) {
-            OrderDetail orderDetail = new OrderDetail();
-            orderDetail.setOrder(order);
-            orderDetail.setCourtSlotId(courtSlotId);
-            orderDetail.setCourtSlotName(courtSlotName);
-            orderDetail.setStartTime(request.getStartTime());
-            orderDetail.setEndTime(request.getEndTime());
-            orderDetail.setPrice(null);
-
-            List<BookingDate> fixedBookingDates = new ArrayList<>();
-            for (LocalDate date : fixedDates) {
-                BookingDate bookingDate = new BookingDate();
-                bookingDate.setBookingDate(date);
-                bookingDate.setOrderDetail(orderDetail);
-                fixedBookingDates.add(bookingDate);
-            }
-            orderDetail.setBookingDates(fixedBookingDates);
-            allOrderDetails.add(orderDetail);
+    //    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public OrderResponse createFixedBooking(FixedBookingRequest request) {
+        // Tạo đơn hàng
+        Order order = new Order();
+        order.setCustomerName(request.getCustomerName());
+        order.setPhoneNumber(request.getPhoneNumber());
+        order.setCourtId(request.getCourtId());
+        order.setCourtName(request.getCourtName());
+        order.setAddress(request.getAddress());
+        order.setOrderStatus("Đang xử lý");
+        order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn cố định");
+        order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa thanh toán");
+        order.setNote(request.getNote());
+        if (request.getUserId() != null && !request.getUserId().isEmpty()) {
+            order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new RuntimeException("User not found")));
         }
 
-        // Flexible dates
-        if (request.getFlexibleCourtSlotFixes() != null) {
-            for (Map.Entry<String, String> entry : request.getFlexibleCourtSlotFixes().entrySet()) {
-                LocalDate conflictDate = LocalDate.parse(entry.getKey());
-                String fixedCourtSlotName = entry.getValue();
-                String fixedCourtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), fixedCourtSlotName);
+        // Lưu order trước để có ID
+        order = orderRepository.save(order);
 
-                OrderDetail flexibleDetail = new OrderDetail();
-                flexibleDetail.setOrder(order);
-                flexibleDetail.setCourtSlotId(fixedCourtSlotId);
-                flexibleDetail.setCourtSlotName(fixedCourtSlotName);
-                flexibleDetail.setStartTime(request.getStartTime());
-                flexibleDetail.setEndTime(request.getEndTime());
-                flexibleDetail.setPrice(null);
+        // Prepare OrderDetails
+        List<LocalDate> bookingDates = getBookingDatesFromDaysOfWeek(
+                request.getStartDate(), request.getEndDate(), request.getSelectedDays()
+        );
 
-                BookingDate bookingDate = new BookingDate();
-                bookingDate.setBookingDate(conflictDate);
-                bookingDate.setOrderDetail(flexibleDetail);
+        List<OrderDetail> allOrderDetails = new ArrayList<>();
 
-                flexibleDetail.setBookingDates(new ArrayList<>(Collections.singletonList(bookingDate)));
-                allOrderDetails.add(flexibleDetail);
+        for (String courtSlotName : request.getSelectedCourtSlots()) {
+            String courtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), courtSlotName);
+
+            // Fixed dates
+            List<LocalDate> fixedDates = bookingDates.stream()
+                    .filter(date -> request.getFlexibleCourtSlotFixes() == null ||
+                            !request.getFlexibleCourtSlotFixes().containsKey(date.toString()))
+                    .collect(Collectors.toList());
+
+            if (!fixedDates.isEmpty()) {
+                OrderDetail orderDetail = new OrderDetail();
+                orderDetail.setOrder(order);
+                orderDetail.setCourtSlotId(courtSlotId);
+                orderDetail.setCourtSlotName(courtSlotName);
+                orderDetail.setStartTime(request.getStartTime());
+                orderDetail.setEndTime(request.getEndTime());
+                orderDetail.setPrice(null);
+
+                List<BookingDate> fixedBookingDates = new ArrayList<>();
+                for (LocalDate date : fixedDates) {
+                    BookingDate bookingDate = new BookingDate();
+                    bookingDate.setBookingDate(date);
+                    bookingDate.setOrderDetail(orderDetail);
+                    fixedBookingDates.add(bookingDate);
+                }
+                orderDetail.setBookingDates(fixedBookingDates);
+                allOrderDetails.add(orderDetail);
+            }
+
+            // Flexible dates
+            if (request.getFlexibleCourtSlotFixes() != null) {
+                for (Map.Entry<String, String> entry : request.getFlexibleCourtSlotFixes().entrySet()) {
+                    LocalDate conflictDate = LocalDate.parse(entry.getKey());
+                    String fixedCourtSlotName = entry.getValue();
+                    String fixedCourtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), fixedCourtSlotName);
+
+                    OrderDetail flexibleDetail = new OrderDetail();
+                    flexibleDetail.setOrder(order);
+                    flexibleDetail.setCourtSlotId(fixedCourtSlotId);
+                    flexibleDetail.setCourtSlotName(fixedCourtSlotName);
+                    flexibleDetail.setStartTime(request.getStartTime());
+                    flexibleDetail.setEndTime(request.getEndTime());
+                    flexibleDetail.setPrice(null);
+
+                    BookingDate bookingDate = new BookingDate();
+                    bookingDate.setBookingDate(conflictDate);
+                    bookingDate.setOrderDetail(flexibleDetail);
+
+                    flexibleDetail.setBookingDates(new ArrayList<>(Collections.singletonList(bookingDate)));
+                    allOrderDetails.add(flexibleDetail);
+                }
             }
         }
+
+        orderDetailRepository.saveAll(allOrderDetails);
+
+        BigDecimal amount = courtClient.calculateTotalPayment(BookingPaymentRequest.builder()
+                .courtId(request.getCourtId())
+                .bookingDates(bookingDates)
+                .startTime(request.getStartTime())
+                .endTime(request.getEndTime())
+                .build()).multiply(BigDecimal.valueOf(request.getSelectedCourtSlots().size()));
+        String billCode = "PM" + GenerateString.generateRandomString(13);
+
+        order.setBillCode(billCode);
+        order.setPaymentAmount(amount);
+        order.setTotalAmount(amount);
+        order = orderRepository.save(order);
+        order.setOrderDetails(allOrderDetails);
+        CreateQrRequest qrRequest = CreateQrRequest.builder()
+                .billCode(billCode)
+                .amount(amount.doubleValue())
+                .signature(encrypt(amount.doubleValue(), billCode, checkSum))
+                .build();
+
+        MbQrCodeResponse qrCodeResponse;
+        try {
+            qrCodeResponse = paymentClient.createQr(qrRequest, apiKey, clientId);
+        } catch (FeignException e) {
+            throw new ApiException(e.getMessage(), "API_MB_CREATE_QR_ERROR");
+        }
+        log.info("send update booking status");
+
+        TransactionRequest transaction = TransactionRequest.builder()
+                .orderId(order.getId())
+                .amount(amount)
+                .paymentStatus(order.getPaymentStatus())
+                .billCode(billCode)
+                .build();
+
+        saveTransactionToRedis(transaction);
+        schedulePaymentCheck(billCode);
+
+        OrderResponse response = orderMapper.toOrderResponse(order);
+        response.setQrcode(qrCodeResponse.getQrCode());
+        redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
+        return response;
     }
-    
-    orderDetailRepository.saveAll(allOrderDetails);
 
-    BigDecimal amount = courtClient.calculateTotalPayment(BookingPaymentRequest.builder()
-            .courtId(request.getCourtId())
-            .bookingDates(bookingDates)
-            .startTime(request.getStartTime())
-            .endTime(request.getEndTime())
-            .build()).multiply(BigDecimal.valueOf(request.getSelectedCourtSlots().size()));
-    String billCode = "PM" + GenerateString.generateRandomString(13);
-
-    order.setBillCode(billCode);
-    order.setPaymentAmount(amount);
-    order.setTotalAmount(amount);
-    order = orderRepository.save(order);
-    order.setOrderDetails(allOrderDetails);
-    CreateQrRequest qrRequest = CreateQrRequest.builder()
-            .billCode(billCode)
-            .amount(amount.doubleValue())
-            .signature(encrypt(amount.doubleValue(), billCode, checkSum))
-            .build();
-
-    MbQrCodeResponse qrCodeResponse;
-    try {
-        qrCodeResponse = paymentClient.createQr(qrRequest, apiKey, clientId);
-    } catch (FeignException e) {
-        throw new ApiException(e.getMessage(), "API_MB_CREATE_QR_ERROR");
-    }
-    log.info("send update booking status");
-
-    TransactionRequest transaction = TransactionRequest.builder()
-            .orderId(order.getId())
-            .amount(amount)
-            .paymentStatus(order.getPaymentStatus())
-            .billCode(billCode)
-            .build();
-
-    saveTransactionToRedis(transaction);
-    schedulePaymentCheck(billCode);
-
-    OrderResponse response = orderMapper.toOrderResponse(order);
-    response.setQrcode(qrCodeResponse.getQrCode());
-    redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
-    return response;
-}
-
-public BigDecimal getPaymentAmount(String courtId, List<LocalDate> dates, LocalTime start, LocalTime end){
-        return  courtClient.calculateTotalPayment(BookingPaymentRequest.builder()
+    public BigDecimal getPaymentAmount(String courtId, List<LocalDate> dates, LocalTime start, LocalTime end) {
+        return courtClient.calculateTotalPayment(BookingPaymentRequest.builder()
                 .courtId(courtId)
                 .bookingDates(dates)
                 .startTime(start)
                 .endTime(end)
                 .build());
-}
+    }
+
+    public String createPaymentOrder(String orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
+
+
+        if (order.getAmountPaid().subtract(order.getTotalAmount()).compareTo(BigDecimal.ZERO) <= 0)
+            throw new ApiException("payment amount of order invalid", "ORDER_INVALID");
+
+        BigDecimal amount = order.getTotalAmount().subtract(order.getAmountPaid());
+        String billCode = "PM" + GenerateString.generateRandomString(13);
+        CreateQrRequest qrRequest = CreateQrRequest.builder()
+                .billCode(billCode)
+                .amount(amount.doubleValue())
+                .signature(encrypt(amount.doubleValue(), billCode, checkSum))
+                .build();
+
+        MbQrCodeResponse qrCodeResponse;
+        try {
+            qrCodeResponse = paymentClient.createQr(qrRequest, apiKey, clientId);
+        } catch (FeignException e) {
+            throw new ApiException(e.getMessage(), "API_MB_CREATE_QR_ERROR");
+        }
+        log.info("send update booking status");
+
+        TransactionRequest transaction = TransactionRequest.builder()
+                .orderId(order.getId())
+                .amount(amount)
+                .paymentStatus(order.getPaymentStatus())
+                .billCode(billCode)
+                .build();
+
+        saveTransactionToRedis(transaction);
+        schedulePaymentCheck(billCode);
+
+        redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
+        return qrCodeResponse.getQrCode();
+    }
+
+
+    public List<OrderResponse> getOrdersByBookingDateAndTimeRange(
+            LocalDate bookingDate,
+            LocalTime startTime,
+            LocalTime endTime) {
+
+        List<String> statuses = Arrays.asList(
+                "Đặt lịch thành công",
+                "Thay đổi lịch đặt thành công",
+                "Đã sử dụng lịch đặt");
+
+        List<Order> orders = orderRepository.findOrdersWithDetailsByBookingDateAndTimeRange(
+                bookingDate,
+                getCourtIdManage(),
+                statuses,
+                startTime,
+                endTime);
+
+        return orderMapper.toOrderResponses(orders);
+    }
+
+
+    public List<OrderResponse> getOrdersByBookingDateAndPhoneNumberWithStatus(
+            LocalDate bookingDate,
+            String phoneNumber) {
+
+
+        List<String> statuses = Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công" , "Đã hoàn thành" , "Đã sử dụng lịch đặt" , "Không sử dụng lịch đặt");
+        List<Order> orders = orderRepository.findByBookingDateAndPhoneNumberWithStatus(
+                bookingDate != null ? bookingDate : LocalDate.now(),
+                phoneNumber,
+                getCourtIdManage(),
+                statuses);
+
+        return orderMapper.toOrderResponses(orders);
+    }
+
+    public OrderPage getOrdersByFilterByStaff(
+            LocalDate bookingDate,
+            LocalTime startTime,
+            LocalTime endTime,
+            String phoneNumber,
+            String customerName,
+            List<String> filterStatuses,
+            int page,
+            int size) {
+
+        // Default statuses if not provided
+        List<String> defaultStatuses = Arrays.asList(
+                "Đặt lịch thành công",
+                "Thay đổi lịch đặt thành công",
+                "Đã hoàn thành",
+                "Đã sử dụng lịch đặt",
+                "Không sử dụng lịch đặt"
+        );
+
+        // Use provided statuses or default
+        List<String> statuses = filterStatuses != null && !filterStatuses.isEmpty()
+                ? filterStatuses
+                : defaultStatuses;
+
+        // Default to current date if bookingDate is null
+        LocalDate effectiveBookingDate = bookingDate != null
+                ? bookingDate
+                : LocalDate.now();
+
+        // Create Pageable object for pagination
+        Pageable pageable = PageRequest.of(page - 1, size);
+
+        // Query orders with filters
+        Page<Order> orders = orderRepository.findOrdersWithFiltersByStaff(
+                effectiveBookingDate,
+                getCourtIdManage(),
+                statuses,
+                startTime,
+                endTime,
+                phoneNumber,
+                customerName,
+                pageable
+        );
+
+        List<OrderData> orderData = orderMapper.toDatas(orders.getContent());
+
+        return OrderPage.builder()
+                .orders(orderData)
+                .totalElements(orders.getTotalElements())
+                .totalPages(orders.getTotalPages())
+                .build();
+    }
+
+
+    private String getCourtIdManage (){
+        boolean isStaff = SecurityContextUtil.isStaff();
+        if(isStaff) throw new ApiException("","STAFF_UNAUTH");
+        User manager = userRepository.findById(SecurityContextUtil.getUid()).orElseThrow(() -> new ApiException("manager unauthorize","MANAGER_UNAUTHORIZE"));
+
+        return manager.getCourtId();
+    }
+
+    public OrderResponse checkin(String orderId){
+        Order order = orderRepository.findByIdAndStatuses(
+                        orderId,
+                Arrays.asList(
+                        "Đặt lịch thành công",
+                        "Thay đổi lịch đặt thành công"),
+                        "Đã thanh toán")
+                .orElseThrow(() -> new ApiException("Order không hợp lệ hoặc không đủ điều kiện","ORDER_INVALID"));
+
+        order.setOrderStatus("Đã sử dụng lịch đặt");
+        orderRepository.save(order);
+
+        return orderMapper.toOrderResponse(order);
+    }
+
+    public void updateExpiredOrdersStatus() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = now.toLocalDate();
+        LocalTime currentTime = now.toLocalTime();
+
+        // 1. Xử lý các order chưa sử dụng
+        processUnusedOrders(today, currentTime);
+
+        // 2. Xử lý các order đã sử dụng
+        processUsedOrders(today, currentTime);
+    }
+
+    private void processUnusedOrders(LocalDate today, LocalTime currentTime) {
+        // Lấy các order có trạng thái hợp lệ và đã quá giờ kết thúc
+        List<Order> unusedOrders = orderRepository.findOrdersToMarkAsUnused(
+                List.of("Đặt lịch thành công", "Thay đổi lịch đặt thành công"),
+                today,
+                currentTime
+        );
+
+        for (Order order : unusedOrders) {
+            try {
+                if ("Đã thanh toán".equals(order.getPaymentStatus()) && !"Đơn cố định".equals(order.getOrderType())) {
+                    order.setPaymentStatus("Đợi hoàn tiền");
+                }
+                order.setOrderStatus("Không sử dụng lịch đặt");
+                orderRepository.save(order);
+                log.info("Updated order {} to status {}", order.getId(), order.getOrderStatus());
+            } catch (Exception e) {
+                log.error("Failed to update order {}: {}", order.getId(), e.getMessage());
+            }
+        }
+    }
+
+    private void processUsedOrders(LocalDate today, LocalTime currentTime) {
+        // Lấy các order đã sử dụng và quá giờ kết thúc
+        List<Order> usedOrders = orderRepository.findOrdersToMarkAsCompleted(
+                List.of("Đã sử dụng lịch đặt"),
+                today,
+                currentTime
+        );
+
+        for (Order order : usedOrders) {
+            try {
+                order.setOrderStatus("Đã hoàn thành");
+                orderRepository.save(order);
+                log.info("Updated order {} to completed status", order.getId());
+            } catch (Exception e) {
+                log.error("Failed to update completed order {}: {}", order.getId(), e.getMessage());
+            }
+        }
+    }
+
+    public OrderResponse createServiceOrder(OrderServiceRequest request) {
+        // Map main order
+        Order order = orderMapper.toOrderService(request);
+
+        // Set user if provided
+        if (request.getUserId() != null && !request.getUserId().isEmpty()) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new ApiException("User not found","USER_NOT_FOUND"));
+            order.setUser(user);
+        }
+
+        // Calculate total amount from services
+        BigDecimal totalAmount = request.getServiceDetails().stream()
+                .map(detail -> detail.getPrice().multiply(BigDecimal.valueOf(detail.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        order.setTotalAmount(totalAmount);
+        order.setPaymentAmount(request.getPaymentAmount() != null ?
+                request.getPaymentAmount() : totalAmount);
+
+        // Map and set service details
+        List<ServiceDetailEntity> serviceDetails = request.getServiceDetails().stream()
+                .map(orderMapper::toServiceDetailEntity)
+                .peek(detail -> detail.setOrder(order))
+                .collect(Collectors.toList());
+
+        order.setServiceDetails(serviceDetails);
+        BigDecimal amount = order.getTotalAmount();
+        String billCode = "PM" + GenerateString.generateRandomString(13);
+        // Set default values
+        order.setAmountPaid(BigDecimal.ZERO);
+        order.setAmountRefund(BigDecimal.ZERO);
+        order.setDepositAmount(BigDecimal.ZERO);
+        order.setDiscountAmount(BigDecimal.ZERO);
+        order.setBillCode(billCode);
+        orderRepository.save(order);
+
+
+        CreateQrRequest qrRequest = CreateQrRequest.builder()
+                .billCode(billCode)
+                .amount(amount.doubleValue())
+                .signature(encrypt(amount.doubleValue(), billCode, checkSum))
+                .build();
+
+        MbQrCodeResponse qrCodeResponse;
+        try {
+            qrCodeResponse = paymentClient.createQr(qrRequest, apiKey, clientId);
+        } catch (FeignException e) {
+            throw new ApiException(e.getMessage(), "API_MB_CREATE_QR_ERROR");
+        }
+        log.info("send update booking status");
+
+
+        TransactionRequest transaction = TransactionRequest.builder()
+                .orderId(order.getId())
+                .amount(amount)
+                .paymentStatus(order.getPaymentStatus())
+                .billCode(billCode)
+                .build();
+
+        saveTransactionToRedis(transaction);
+        schedulePaymentCheck(billCode);
+
+        OrderResponse response = orderMapper.toOrderResponse(order);
+        response.setQrcode(qrCodeResponse.getQrCode());
+        redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
+        return response;
+    }
+
+
+    public List<TransactionHistory> getTransactionHistory(String orderId) {
+        List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
+
+        return transactions.stream().map(transaction -> {
+            TransactionHistory history = new TransactionHistory();
+            history.setPaymentStatus(transaction.getPaymentStatus());
+            history.setAmount(transaction.getAmount());
+            history.setBillCode(transaction.getBillCode());
+            history.setStatus(transaction.getStatus());
+            history.setCreateDate(transaction.getCreateDate());
+            return history;
+        }).collect(Collectors.toList());
+    }
+
 
 //    private OrderResponse mapToOrderResponse(Order order, List<OrderDetail> fixedOrderDetails, List<OrderDetail> flexibleOrderDetails) {
 //        return OrderResponse.builder()

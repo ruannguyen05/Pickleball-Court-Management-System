@@ -33,5 +33,14 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
 
     List<User> findByCourtId (String courtId);
 
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r " +
+            "WHERE (:courtId IS NULL OR u.courtId = :courtId) " +
+            "AND (" +
+            "(:role IS NULL AND r.name NOT IN ('MANAGER', 'ADMIN')) " +
+            "OR (:role IS NOT NULL AND :role IN (r.name))" +
+            ")")
+    List<User> findUsersByRoleAndCourtIdManager(
+            @Param("role") String role,
+            @Param("courtId") String courtId);
 
 }

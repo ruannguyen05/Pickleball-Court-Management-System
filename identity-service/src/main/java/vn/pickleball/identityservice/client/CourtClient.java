@@ -5,7 +5,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.identityservice.dto.request.BookingPaymentRequest;
+import vn.pickleball.identityservice.dto.request.CheckValidMaintenance;
+import vn.pickleball.identityservice.dto.request.CourtServicePurchaseRequest;
 import vn.pickleball.identityservice.dto.request.UpdateBookingSlot;
+import vn.pickleball.identityservice.dto.response.CourtPriceResponse;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,12 +22,8 @@ public interface CourtClient {
     @PostMapping("${court_service.update_bookingSlot}")
     ResponseEntity<Void> updateBookingSlot(@RequestBody UpdateBookingSlot updateBookingSlot);
 
-    @GetMapping("/public/check-maintenance-slots")
-    ResponseEntity<Map<String, List<LocalDate>>> getInvalidCourtSlots(
-            @RequestParam("courtId") String courtId,
-            @RequestParam("bookingDates") List<LocalDate> bookingDates,
-            @RequestParam("startTime") LocalTime startTime,
-            @RequestParam("endTime") LocalTime endTime);
+    @PostMapping("/public/check-maintenance-slots")
+    ResponseEntity<Map<String, List<LocalDate>>> getInvalidCourtSlots(@RequestBody CheckValidMaintenance request);
 
 
     @GetMapping("/public/court_slot/getIdsByCourtId/{courtId}")
@@ -43,5 +42,14 @@ public interface CourtClient {
 
     @PostMapping("/public/synchronous")
     void synchronous(@RequestParam String courtId);
+
+    @GetMapping("/public/court_price/getByCourtId/{courtId}")
+    CourtPriceResponse getCourtPriceByCourtId(@PathVariable("courtId") String courtId);
+
+    @PostMapping("/public/service/purchase-update")
+    ResponseEntity<Void> updateAfterPurchase(@RequestBody List<CourtServicePurchaseRequest> requests);
+
+    @GetMapping("/public/court/ids")
+    ResponseEntity<List<String>> getCourtIds();
 }
 

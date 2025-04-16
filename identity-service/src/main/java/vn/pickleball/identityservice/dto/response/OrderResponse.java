@@ -32,7 +32,7 @@ public class OrderResponse {
     private BigDecimal amountRefund;
     private LocalDateTime paymentTimeout;
     private List<OrderDetailResponse> orderDetails;
+    private List<ServiceDetailResponse> serviceDetails;
     private String qrcode;
     private LocalDateTime createdAt;
-
 }

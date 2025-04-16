@@ -25,7 +25,7 @@ public class OrderDetail {
     private String courtSlotId;
 
     @Column(nullable = false)
-    private String courtSlotName; // ID của CourtSlot (ví dụ: "Pickleball 2")
+    private String courtSlotName; // name của CourtSlot (ví dụ: "Pickleball 2")
 
     @Column(nullable = false)
     private LocalTime startTime; // Thời gian bắt đầu (ví dụ: "19:30")

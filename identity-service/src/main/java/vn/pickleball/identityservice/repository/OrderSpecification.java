@@ -9,23 +9,9 @@ import vn.pickleball.identityservice.entity.OrderDetail;
 import java.time.LocalDate;
 import java.util.List;
 
-public class OrderSpecifications {
+public class OrderSpecification {
 
-    public static Specification<Order> hasCourtId(String courtId) {
-        return (root, query, cb) ->
-                courtId != null ? cb.equal(root.get("courtId"), courtId) : null;
-    }
-
-    public static Specification<Order> hasOrderStatus(String orderStatus) {
-        return (root, query, cb) ->
-                orderStatus != null ? cb.equal(root.get("orderStatus"), orderStatus) : null;
-    }
-
-    public static Specification<Order> hasPaymentStatus(String paymentStatus) {
-        return (root, query, cb) ->
-                paymentStatus != null ? cb.equal(root.get("paymentStatus"), paymentStatus) : null;
-    }
-
+    // Lọc theo khoảng ngày booking (từ BookingDate trong OrderDetail)
     public static Specification<Order> hasBookingDateBetween(LocalDate start, LocalDate end) {
         if (start == null && end == null) return null;
 
@@ -51,5 +37,33 @@ public class OrderSpecifications {
 
             return cb.exists(subquery);
         };
+    }
+
+    // Lọc theo trạng thái đơn hàng
+    public static Specification<Order> hasOrderStatusIn(List<String> statuses) {
+        return (root, query, cb) -> statuses != null ?
+                root.get("orderStatus").in(statuses) :
+                cb.conjunction();
+    }
+
+    // Lọc theo trạng thái thanh toán
+    public static Specification<Order> hasPaymentStatusIn(List<String> statuses) {
+        return (root, query, cb) -> statuses != null ?
+                root.get("paymentStatus").in(statuses) :
+                cb.conjunction();
+    }
+
+    // Lọc theo danh sách sân
+    public static Specification<Order> hasCourtIdIn(List<String> courtIds) {
+        return (root, query, cb) -> courtIds != null ?
+                root.get("courtId").in(courtIds) :
+                cb.conjunction();
+    }
+
+    // Lọc theo loại đơn hàng (ONLINE/OFFLINE)
+    public static Specification<Order> hasOrderTypeIn(List<String> orderTypes) {
+        return (root, query, cb) -> orderTypes != null ?
+                root.get("orderType").in(orderTypes) :
+                cb.conjunction();
     }
 }

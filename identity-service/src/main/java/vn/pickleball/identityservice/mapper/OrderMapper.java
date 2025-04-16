@@ -108,8 +108,17 @@ public interface OrderMapper {
     @Mapping(source = "id", target = "id")
     @Mapping(target = "userId", source = "user.id")
     @Mapping(target = "createdAt", source = "createdAt")
-    @Mapping(target = "orderDetails", expression = "java(mapOrderDetailsToResponse(order.getOrderDetails()))")
+    @Mapping(target = "orderDetails", expression = "java(shouldMapOrderDetails(order) ? mapOrderDetailsToResponse(order.getOrderDetails()) : null)")
+    @Mapping(target = "serviceDetails", expression = "java(shouldMapServiceDetails(order) ? mapServiceDetailsToResponse(order.getServiceDetails()) : null)")
     OrderResponse toOrderResponse(Order order);
+
+    default boolean shouldMapOrderDetails(Order order) {
+        return order.getOrderType() != null && !order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
+    }
+
+    default boolean shouldMapServiceDetails(Order order) {
+        return order.getOrderType() != null && order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
+    }
 
     default List<OrderDetailResponse> mapOrderDetailsToResponse(List<OrderDetail> orderDetails) {
         if (orderDetails == null || orderDetails.isEmpty()) {
@@ -128,15 +137,29 @@ public interface OrderMapper {
                 .collect(Collectors.toList());
     }
 
-    List<OrderResponse> toOrderResponses(List<Order> orders);
+    default List<ServiceDetailResponse> mapServiceDetailsToResponse(List<ServiceDetailEntity> serviceDetails) {
+        if (serviceDetails == null || serviceDetails.isEmpty()) {
+            return Collections.emptyList();
+        }
 
+        return serviceDetails.stream()
+                .map(serviceDetail -> ServiceDetailResponse.builder()
+                        .courtServiceId(serviceDetail.getCourtServiceId())
+                        .courtServiceName(serviceDetail.getCourtServiceName())
+                        .quantity(serviceDetail.getQuantity())
+                        .price(serviceDetail.getPrice())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    List<OrderResponse> toOrderResponses(List<Order> orders);
 
 
     @Mapping(target = "courtId", source = "courtId")
     @Mapping(target = "dateBooking", source = "orderDetail.bookingDate")
     @Mapping(target = "status", expression = "java(BookingStatus.BOOKED)")
     @Mapping(target = "courtSlotBookings", source = "orderDetail.bookingSlots", qualifiedByName = "mapCourtSlotBookings")
-    UpdateBookingSlot toUpdateBookingSlot(String courtId,OrderDetailRequest orderDetail);
+    UpdateBookingSlot toUpdateBookingSlot(String courtId, OrderDetailRequest orderDetail);
 
     @Named("mapCourtSlotBookings")
     default Map<String, List<LocalTime>> mapCourtSlotBookings(List<OrderDetailDto> bookingSlots) {
@@ -244,6 +267,23 @@ public interface OrderMapper {
         updateBookingSlot.setCourtSlotBookings(courtSlotBookings);
         return updateBookingSlot;
     }
+
+    @Mapping(target = "orderStatus", constant = "Đặt dịch vụ tại sân")
+    @Mapping(target = "paymentStatus", constant = "Chưa thanh toán")
+    @Mapping(target = "orderType", constant = "Đơn dịch vụ")
+    @Mapping(target = "orderDetails", ignore = true)
+    @Mapping(target = "serviceDetails", ignore = true)
+    @Mapping(target = "transactions", ignore = true)
+    @Mapping(target = "user", ignore = true)
+    Order toOrderService(OrderServiceRequest request);
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "order", ignore = true)
+    ServiceDetailEntity toServiceDetailEntity(ServiceDetailRequest request);
+
+    CourtServicePurchaseRequest toPurchaseRequest(ServiceDetailEntity entity);
+
+    List<CourtServicePurchaseRequest> toPurchaseRequestList(List<ServiceDetailEntity> entities);
 
 //    @Mapping(target = "fixedOrderDetails", source = "fixedOrderDetails")
 //    @Mapping(target = "flexibleOrderDetails", source = "flexibleOrderDetails")

@@ -1,13 +1,15 @@
-package vn.pickleball.identityservice.dto.request;
+package vn.pickleball.identityservice.dto.response;
 
-import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Data
-public class ServiceDetailRequest {
+@Builder
+@AllArgsConstructor
+public class ServiceDetailResponse {
     private String courtServiceId;
     private String courtServiceName;
     private int quantity;

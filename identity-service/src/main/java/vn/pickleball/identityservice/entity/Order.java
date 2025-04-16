@@ -26,8 +26,8 @@ public class Order extends BaseEntity{
     @Column(nullable = false)
     private String address; // Địa chỉ sân (ví dụ: "449 Lê Văn Việt quận 9")
 
-    @Column(nullable = false)
-    private LocalDate bookingDate; // Ngày đặt sân (ví dụ: "22/02/2025")
+//    @Column(nullable = false)
+//    private LocalDate bookingDate; // Ngày đặt sân (ví dụ: "22/02/2025")
 
     @Column(nullable = false)
     private String customerName; // Tên người đặt (ví dụ: "Nguyễn Văn Ruấn")
@@ -84,6 +84,10 @@ public class Order extends BaseEntity{
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<OrderDetail> orderDetails = new ArrayList<>();
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonManagedReference
+    private List<ServiceDetailEntity> serviceDetails = new ArrayList<>();
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference

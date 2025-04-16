@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.model.request;
+package vn.pickleball.identityservice.dto.request;
 
 import lombok.Data;
 

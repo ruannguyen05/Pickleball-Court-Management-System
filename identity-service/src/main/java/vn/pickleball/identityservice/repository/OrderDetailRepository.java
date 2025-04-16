@@ -14,9 +14,6 @@ import java.util.List;
 @Repository
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, String> {
 
-    @Query("SELECT od FROM OrderDetail od WHERE od.order.bookingDate = :bookingDate")
-    List<OrderDetail> findAllByBookingDate(@Param("bookingDate") LocalDate bookingDate);
-
     @Modifying
     @Query("DELETE FROM OrderDetail od WHERE od.order = :order")
     void deleteByOrder(@Param("order") Order order);

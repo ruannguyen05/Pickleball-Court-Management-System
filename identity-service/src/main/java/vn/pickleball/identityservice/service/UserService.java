@@ -39,6 +39,7 @@ import vn.pickleball.identityservice.repository.RoleRepository;
 import vn.pickleball.identityservice.repository.UserRepository;
 import vn.pickleball.identityservice.repository.UserSpecification;
 import vn.pickleball.identityservice.utils.GenerateString;
+import vn.pickleball.identityservice.utils.SecurityContextUtil;
 import vn.pickleball.identityservice.websockethandler.NotificationWebSocketHandler;
 
 import java.io.IOException;
@@ -223,11 +224,29 @@ public class UserService {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    public PagedUserResponse getUsers(int page, int size, String username, String phoneNumber, String email, String roleName) {
+    public PagedUserResponse getUsers(int page, int size, String username, String phoneNumber, String email, String roleName, String courtId) {
         Pageable pageable = PageRequest.of(page - 1 , size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         Page<User> userPage = userRepository.findAll(
-                UserSpecification.filterUsersExcludeAdmin(username, phoneNumber, email, roleName),
+                UserSpecification.filterUsersExcludeAdmin(username, phoneNumber, email, roleName, courtId),
+                pageable
+        );
+
+        List<UserResponse> userResponses = userMapper.toUsersResponses(userPage.getContent());
+
+        return PagedUserResponse.builder()
+                .users(userResponses)
+                .totalPages(userPage.getTotalPages())
+                .totalElements(userPage.getTotalElements())
+                .build();
+    }
+
+    @PreAuthorize("hasRole('MANAGER')")
+    public PagedUserResponse getUsersManager(int page, int size, String username, String phoneNumber, String email, String roleName) {
+        Pageable pageable = PageRequest.of(page - 1 , size, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<User> userPage = userRepository.findAll(
+                UserSpecification.filterUsersExcludeManager(username, phoneNumber, email, roleName, getCourtIdManage()),
                 pageable
         );
 
@@ -249,7 +268,13 @@ public class UserService {
 
     @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> getUsersByRole(String role) {
-        return userRepository.findUsersWithRole(role.toUpperCase()).stream().map(userMapper::toUserResponse).toList();
+        return userRepository.findUsersWithRole(role != null ? role.toUpperCase() : null).stream().map(userMapper::toUserResponse).toList();
+    }
+
+    private String getCourtIdManage(){
+        User manager = userRepository.findById(SecurityContextUtil.getUid()).orElseThrow(() -> new ApiException("manager unauthorize","MANAGER_UNAUTHORIZE"));
+
+        return manager.getCourtId();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
