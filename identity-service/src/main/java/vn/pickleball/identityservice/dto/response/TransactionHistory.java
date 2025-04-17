@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 public class TransactionHistory {
     private String paymentStatus;
     private BigDecimal amount;
-    private String billCode;
     private String status;
     private LocalDateTime createDate;
 

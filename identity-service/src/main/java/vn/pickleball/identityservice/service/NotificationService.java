@@ -10,6 +10,7 @@ import vn.pickleball.identityservice.entity.Notification;
 import vn.pickleball.identityservice.entity.Order;
 import vn.pickleball.identityservice.entity.OrderDetail;
 import vn.pickleball.identityservice.entity.User;
+import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.NotificationMapper;
 import vn.pickleball.identityservice.mapper.OrderMapper;
 import vn.pickleball.identityservice.repository.NotificationRepository;
@@ -65,7 +66,7 @@ public class NotificationService {
     // Cập nhật trạng thái thông báo
     public NotificationRequest updateStatus(String id) {
         Notification notification = notificationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ApiException("Notification not found", "ENTITY_NOTFOUND"));
 
         notification.setStatus("read");
         return notificationMapper.toDto(notificationRepository.save(notification));

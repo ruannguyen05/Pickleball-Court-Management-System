@@ -25,6 +25,7 @@ import vn.pickleball.identityservice.dto.request.RefreshRequest;
 import vn.pickleball.identityservice.dto.response.AuthenticationResponse;
 import vn.pickleball.identityservice.dto.response.IntrospectResponse;
 import vn.pickleball.identityservice.entity.User;
+import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.exception.AppException;
 import vn.pickleball.identityservice.exception.ErrorCode;
 import vn.pickleball.identityservice.repository.UserRepository;
@@ -47,7 +48,7 @@ public class AuthenticationService {
 
     @NonFinal
     @Value("${jwt.signerKey}")
-    protected String SIGNER_KEY;
+    protected String SIGNER_KEY; // String -> byte[]
 
     @NonFinal
     @Value("${jwt.valid-duration}")
@@ -147,7 +148,7 @@ public class AuthenticationService {
             return jwsObject.serialize();
         } catch (JOSEException e) {
             log.error("Cannot create token", e);
-            throw new RuntimeException(e);
+            throw new ApiException("Cannot create token", "TOKEN_ERROR");
         }
     }
 
@@ -186,8 +187,6 @@ public class AuthenticationService {
         if (!CollectionUtils.isEmpty(user.getRoles()))
             user.getRoles().forEach(role -> {
                 stringJoiner.add("ROLE_" + role.getName());
-                if (!CollectionUtils.isEmpty(role.getPermissions()))
-                    role.getPermissions().forEach(permission -> stringJoiner.add(permission.getName()));
             });
 
         return stringJoiner.toString();

@@ -25,6 +25,7 @@ public class UserCreationRequest implements Serializable {
     String username;
 
     @Size(min = 6, message = "INVALID_PASSWORD")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$", message = "INVALID_PASSWORD_FORMAT")
     String password;
 
     String firstName;

@@ -64,6 +64,8 @@ public class UserService {
 
 
     public UserResponse createUser(UserCreationRequest request) {
+
+
         User user = userMapper.toUser(request);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 

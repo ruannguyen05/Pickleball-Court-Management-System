@@ -8,15 +8,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import vn.pickleball.identityservice.dto.request.RoleRequest;
 import vn.pickleball.identityservice.dto.response.RoleResponse;
-import vn.pickleball.identityservice.entity.Permission;
 import vn.pickleball.identityservice.entity.Role;
+import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.RoleMapper;
-import vn.pickleball.identityservice.repository.PermissionRepository;
 import vn.pickleball.identityservice.repository.RoleRepository;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -24,16 +22,12 @@ import java.util.Set;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class RoleService {
     RoleRepository roleRepository;
-    PermissionRepository permissionRepository;
     RoleMapper roleMapper;
 
     @PreAuthorize("hasRole('ADMIN')")
     public RoleResponse create(RoleRequest request) {
         var role = roleMapper.toRole(request);
 
-//        var permissions = permissionRepository.findAllById(request.getPermissions());
-//        role.setPermissions(new HashSet<>(permissions));
-        role.setPermissions(null);
         role = roleRepository.save(role);
         return roleMapper.toRoleResponse(role);
     }
@@ -44,10 +38,8 @@ public class RoleService {
 
     public RoleResponse updateRole(RoleRequest request) {
         Role role = roleRepository.findById(request.getName())
-                .orElseThrow(() -> new RuntimeException("Role not found"));
+                .orElseThrow(() -> new ApiException("Role not found", "ENTITY_NOTFOUND"));
 
-        var permissions = permissionRepository.findAllById(request.getPermissions());
-        role.setPermissions(new HashSet<>(permissions));
 
         role.setDescription(request.getDescription());
         roleRepository.save(role);

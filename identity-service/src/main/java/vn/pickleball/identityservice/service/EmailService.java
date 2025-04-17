@@ -160,7 +160,7 @@ public class EmailService {
 
             mailSender.send(message);
         } catch (MessagingException e) {
-            throw new RuntimeException("Lỗi khi gửi email: " + e.getMessage());
+            throw new RuntimeException("Send mail error");
         }
     }
 

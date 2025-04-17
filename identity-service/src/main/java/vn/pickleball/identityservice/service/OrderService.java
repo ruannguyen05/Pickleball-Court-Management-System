@@ -136,7 +136,7 @@ public class OrderService {
                 courtClient.updateBookingSlot(updateBookingSlot);
             } catch (FeignException e) {
                 log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
             }
         }
 
@@ -218,7 +218,7 @@ public class OrderService {
                 courtClient.updateBookingSlot(updateBookingSlot);
             } catch (FeignException e) {
                 log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                throw new ApiException("Not found scheduler for selected date booking","CREATE_ORDER_FAIL");
             }
         }
 
@@ -266,7 +266,7 @@ public class OrderService {
                     courtClient.updateBookingSlot(updateBookingSlot);
                 } catch (FeignException e) {
                     log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                    throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                    throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
             return response;
@@ -292,7 +292,7 @@ public class OrderService {
                     courtClient.updateBookingSlot(updateBookingSlot);
                 } catch (FeignException e) {
                     log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                    throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                    throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
             return orderMapper.toOrderResponse(finalOrder);
@@ -307,7 +307,7 @@ public class OrderService {
                     courtClient.updateBookingSlot(updateBookingSlot);
                 } catch (FeignException e) {
                     log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                    throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                    throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
             return orderMapper.toOrderResponse(finalOrder);
@@ -371,7 +371,7 @@ public class OrderService {
                     courtClient.updateBookingSlot(updateBookingSlot);
                 } catch (FeignException e) {
                     log.error("Failed to update booking slot: {}", updateBookingSlot, e);
-                    throw new RuntimeException("Failed to update booking slot: " + e.getMessage());
+                    throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
         }
@@ -1005,7 +1005,7 @@ public class OrderService {
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa thanh toán");
         order.setNote(request.getNote());
         if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-            order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new RuntimeException("User not found")));
+            order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new ApiException("User not found","ENTITY_NOTFOUND")));
         }
 
         // Lưu order trước để có ID
@@ -1365,6 +1365,7 @@ public class OrderService {
         order.setAmountRefund(BigDecimal.ZERO);
         order.setDepositAmount(BigDecimal.ZERO);
         order.setDiscountAmount(BigDecimal.ZERO);
+        order.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
         order.setBillCode(billCode);
         orderRepository.save(order);
 
@@ -1408,7 +1409,6 @@ public class OrderService {
             TransactionHistory history = new TransactionHistory();
             history.setPaymentStatus(transaction.getPaymentStatus());
             history.setAmount(transaction.getAmount());
-            history.setBillCode(transaction.getBillCode());
             history.setStatus(transaction.getStatus());
             history.setCreateDate(transaction.getCreateDate());
             return history;
