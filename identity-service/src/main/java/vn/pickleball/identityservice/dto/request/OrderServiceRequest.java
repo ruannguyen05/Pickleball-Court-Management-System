@@ -18,6 +18,10 @@ public class OrderServiceRequest {
     @NotBlank(message = "Address is required")
     private String address;
 
+    private String customerName;
+
+    private String phoneNumber;
+
     private String userId;
 
     @NotBlank
