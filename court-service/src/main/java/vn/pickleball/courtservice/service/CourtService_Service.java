@@ -85,7 +85,9 @@ public class CourtService_Service {
         }
 
         try {
-            firebaseStorageService.uploadFile(file, "courts/" + courtService.getCourt().getId() + "/services");
+            String fileUrl = firebaseStorageService.uploadFile(file, "courts/" + courtService.getCourt().getId() + "/services");
+            courtService.setImageUrl(fileUrl);
+            courtServiceRepository.save(courtService);
         } catch (IOException e) {
             throw new ApiException("Upload service image fail","UPLOAD_FAIL");
         }
