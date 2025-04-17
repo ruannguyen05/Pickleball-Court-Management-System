@@ -27,14 +27,14 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AuthorizationFilter implements GlobalFilter {
 
-    @Value("${permit.paths}")
-    private String permitPaths;
+    @Value("${permit.white_list}")
+    private String white_list;
 
     private final OAuth2Service oAuth2Service;
 
 
     private List<String> getPermitPathList() {
-        return Arrays.asList(permitPaths.split("\\|"));
+        return Arrays.asList(white_list.split("\\|"));
     }
 
     @Override

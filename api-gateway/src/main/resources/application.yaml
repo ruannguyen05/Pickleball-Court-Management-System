@@ -2,7 +2,7 @@ DEFAULT:
   PORT: 8080
   COURT_SERVICE: http://localhost:8082
   IDENTITY_SERVICE: http://localhost:8081
-  PERMIT_PATH: /identity/auth|/court/public|/identity/users/create_user|/identity/public
+  WHITE_LIST: /identity/auth|/court/public|/identity/users/create_user|/identity/users/registerForStudent|/identity/public
 
 ---
 
@@ -39,6 +39,6 @@ service-url:
   identity-service: ${IDENTITY_SERVICE:${DEFAULT.IDENTITY_SERVICE}}
 
 permit:
-  paths: ${PERMIT_PATH:${DEFAULT.PERMIT_PATH}}
+  white_list: ${WHITE_LIST:${DEFAULT.WHITE_LIST}}
 
 
