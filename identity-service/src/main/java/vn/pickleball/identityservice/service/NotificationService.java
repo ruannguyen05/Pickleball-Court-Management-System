@@ -38,11 +38,12 @@ public class NotificationService {
 
     // Lưu thông báo mới
     public NotificationRequest saveNotification(NotificationRequest request, String phoneNumber) {
+        User user = userService.findByPhoneNumber(phoneNumber)
+                .orElse(null);
+
         Notification notification = notificationMapper.toEntity(request);
+        notification.setUser(user);
         notification.setPhoneNumber(phoneNumber);
-
-        userService.findByPhoneNumber(phoneNumber).ifPresent(notification::setUser);
-
         notification.setCreateAt(LocalDateTime.now());
         return notificationMapper.toDto(notificationRepository.save(notification));
     }

@@ -59,6 +59,7 @@ public class User extends BaseEntity{
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @JsonManagedReference
+    @JsonIgnore
     private List<Notification> notifications;
 
     private String avatar;
