@@ -160,7 +160,7 @@ public class CourtService {
     }
 
     public List<String> getCourtIdsByUserId(String userId) {
-        String url = UriComponentsBuilder.fromHttpUrl("http://localhost:8081/identity/public/getCourtIdsByUserId")
+        String url = UriComponentsBuilder.fromHttpUrl("http://203.145.46.242:8080/api/identity/public/getCourtIdsByUserId")
                 .queryParam("userid", userId)
                 .toUriString();
 
