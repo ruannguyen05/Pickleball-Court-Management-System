@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class CourtMaintenanceHistoryService {
 
     private final CourtMaintenanceHistoryRepository maintenanceHistoryRepository;
-    private final CourtSlotRepository courtSlotRepository;
+    private final CourtSlotService courtSlotService;
     private final RestTemplate restTemplate;
     private final RedisTemplate<String, String> redisString;
     private final BookingSlotService bookingSlotService;
@@ -40,8 +40,7 @@ public class CourtMaintenanceHistoryService {
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
     public void addMaintenanceHistory(CourtMaintenanceHistoryRequestDTO dto) {
-        CourtSlot courtSlot = courtSlotRepository.findById(dto.getCourtSlotId())
-                .orElseThrow(() -> new RuntimeException("Court slot not found"));
+        CourtSlot courtSlot = courtSlotService.getCourtSlotByCourtSlotId(dto.getCourtSlotId());
 
         checkBookingConflicts(courtSlot, dto.getStartTime(), dto.getEndTime());
 

@@ -30,18 +30,13 @@ public class CourtSlotService {
 
     private final CourtSlotRepository courtSlotRepository;
 
-    private final CourtRepository courtRepository;
+    private final CourtService courtService;
 
     private final CourtSlotMapper courtSlotMapper;
 
-    private final BookingSlotService bookingSlotService;
-
-    private final AuthorizationService authorizationService;
-
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtSlotRequest.courtId)")
     public CourtSlotResponse createCourtSlot(CourtSlotRequest courtSlotRequest) {
-        Court court = courtRepository.findById(courtSlotRequest.getCourtId())
-                .orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court = courtService.getCourtByCourtId(courtSlotRequest.getCourtId());
 
         CourtSlot exist = courtSlotRepository.findByCourtIdAndName(court.getId(), courtSlotRequest.getName()).orElse(null);
 
@@ -51,7 +46,7 @@ public class CourtSlotService {
         courtSlot.setCourt(court);
         courtSlot.setActive(true);
         courtSlot = courtSlotRepository.save(courtSlot);
-        bookingSlotService.deleteBookingSlotsByCourtId(court.getId());
+        courtService.deleteBookingSlotsByCourtId(court.getId());
         return courtSlotMapper.courtSlotToCourtSlotResponse(courtSlot);
     }
 
@@ -61,6 +56,11 @@ public class CourtSlotService {
         return courtSlotMapper.courtSlotToCourtSlotResponse(courtSlot);
     }
 
+    public CourtSlot getCourtSlotByCourtSlotId(String id) {
+        return courtSlotRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
+    }
+
     public List<CourtSlotResponse> getAllCourtSlots() {
         List<CourtSlot> courtSlots = courtSlotRepository.findAll();
         return courtSlots.stream()
@@ -68,7 +68,7 @@ public class CourtSlotService {
                 .collect(Collectors.toList());
     }
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("@authorizationService.hasAccessToCourtSlot(#courtSlotRequest.id)")
     public CourtSlotResponse updateCourtSlot(CourtSlotRequest courtSlotRequest) {
         CourtSlot courtSlot = courtSlotRepository.findById(courtSlotRequest.getId())
                 .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
@@ -82,28 +82,28 @@ public class CourtSlotService {
         return courtSlotMapper.courtSlotToCourtSlotResponse(courtSlot);
     }
 
-    @PreAuthorize("@authorizationService.hasAccessToCourt(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToCourtSlot(#id)")
     public void deleteCourtSlot(String id) {
         CourtSlot courtSlot = courtSlotRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
-        bookingSlotService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
+        courtService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
         courtSlotRepository.deleteById(id);
     }
 
-    @PreAuthorize("@authorizationService.hasAccessToCourt(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToCourtSlot(#id)")
     public void disableCourtSlot(String id) {
         CourtSlot courtSlot = courtSlotRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
-        bookingSlotService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
+        courtService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
         courtSlot.setActive(false);
         courtSlotRepository.save(courtSlot);
     }
 
-    @PreAuthorize("@authorizationService.hasAccessToCourt(#id)")
+    @PreAuthorize("@authorizationService.hasAccessToCourtSlot(#id)")
     public void activeCourtSlot(String id) {
         CourtSlot courtSlot = courtSlotRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("CourtSlot not found"));
-        bookingSlotService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
+        courtService.deleteBookingSlotsByCourtId(courtSlot.getCourt().getId());
         courtSlot.setActive(true);
         courtSlotRepository.save(courtSlot);
     }
@@ -119,4 +119,14 @@ public class CourtSlotService {
         CourtSlot exist = courtSlotRepository.findByCourtIdAndName(courtId, name).orElseThrow(() -> new RuntimeException("CourtSlot not found"));
         return courtSlotMapper.courtSlotToCourtSlotResponse(exist);
     }
+
+    public String getCourtIdByCourtSlotId(String courtSlotId){
+        CourtSlot courtSlot = courtSlotRepository.findById(courtSlotId).orElseThrow(() -> new RuntimeException("CourtSlot not found"));
+        return courtSlot.getCourt().getId();
+    }
+
+    public List<CourtSlot> findByCourtIdOrderByCreatedAtAsc(String courtId){
+        return courtSlotRepository.findActiveByCourtId(courtId);
+    }
+
 }

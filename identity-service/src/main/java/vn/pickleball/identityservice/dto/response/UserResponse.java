@@ -24,13 +24,9 @@ public class UserResponse {
 
     String phoneNumber;
 
-    boolean student;
-
     UserRank userRank;
 
     Gender gender;
-
-    private String courtId;
 
     private String avatar;
 

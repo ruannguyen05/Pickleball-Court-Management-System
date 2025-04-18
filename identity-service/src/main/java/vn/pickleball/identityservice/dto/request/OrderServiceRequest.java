@@ -12,12 +12,6 @@ public class OrderServiceRequest {
     @NotBlank(message = "Court ID is required")
     private String courtId;
 
-    @NotBlank(message = "Court name is required")
-    private String courtName;
-
-    @NotBlank(message = "Address is required")
-    private String address;
-
     private String customerName;
 
     private String phoneNumber;

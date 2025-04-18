@@ -1,6 +1,7 @@
 package vn.pickleball.identityservice.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -25,15 +26,20 @@ public class UserCreationRequest implements Serializable {
     String username;
 
     @Size(min = 6, message = "INVALID_PASSWORD")
-    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d]{6,}$", message = "INVALID_PASSWORD_FORMAT")
+    @Pattern(
+            regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/]{6,}$",
+            message = "INVALID_PASSWORD_FORMAT"
+    )
     String password;
 
     String firstName;
     String lastName;
 
-
+    @JsonProperty("dob")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     @DobConstraint(min = 10, message = "INVALID_DOB")
     LocalDate dob;
+
 
     List<String> roles;
 
@@ -43,14 +49,9 @@ public class UserCreationRequest implements Serializable {
     @Pattern(regexp = "^(0[0-9]{9,10})$", message = "Phone number must start with 0 and be 10-11 digits long")
     private String phoneNumber;
 
-    boolean isStudent;
-
-    @JsonFormat(shape = JsonFormat.Shape.STRING)
-    UserRank userRank;
-
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     Gender gender;
 
-    private String courtId;
+    List<String> courtIds;
 
 }

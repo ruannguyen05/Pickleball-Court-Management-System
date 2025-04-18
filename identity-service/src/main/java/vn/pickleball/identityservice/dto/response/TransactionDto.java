@@ -11,8 +11,6 @@ public class TransactionDto {
     private String paymentStatus;
     private BigDecimal amount;
     private String billCode;
-    private String status;
     private String ftCode;
     private LocalDateTime createDate;
-    private String courtId;
 }

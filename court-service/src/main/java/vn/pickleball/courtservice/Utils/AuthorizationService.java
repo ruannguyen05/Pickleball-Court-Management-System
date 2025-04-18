@@ -6,13 +6,18 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import vn.pickleball.courtservice.repository.CourtRepository;
 import vn.pickleball.courtservice.repository.CourtSlotRepository;
+import vn.pickleball.courtservice.service.CourtService;
+import vn.pickleball.courtservice.service.CourtSlotService;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class AuthorizationService {
-    private final CourtSlotRepository courtSlotRepository;
+    private final CourtService courtService;
+    private final CourtSlotService courtSlotService;
 
-    public boolean hasAccessToCourt(String courtSlotId) {
+    public boolean hasAccessToCourt(String courtId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || authentication.getAuthorities() == null) {
@@ -29,13 +34,30 @@ public class AuthorizationService {
         boolean isManager = authentication.getAuthorities().stream()
                 .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_MANAGER"));
 
-        if (isManager) {
-            String userId = SecurityContextUtil.getUid();
-            return courtSlotRepository.findById(courtSlotId)
-                    .map(courtSlot -> courtSlot.getCourt().getManagerId().equals(userId))
-                    .orElse(false);
+        List<String> courtIds = courtService.getCourtIdsByUserId(SecurityContextUtil.getUid());
+
+        return courtIds.contains(courtId);
+    }
+
+    public boolean hasAccessToCourtSlot(String courtSlotId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
         }
 
-        return false;
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_ADMIN"));
+
+        if (isAdmin) {
+            return true;
+        }
+
+        boolean isManager = authentication.getAuthorities().stream()
+                .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_MANAGER"));
+
+        List<String> courtIds = courtService.getCourtIdsByUserId(SecurityContextUtil.getUid());
+
+        return courtIds.contains(courtSlotService.getCourtIdByCourtSlotId(courtSlotId));
     }
 }

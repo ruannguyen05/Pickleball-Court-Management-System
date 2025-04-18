@@ -9,7 +9,6 @@ import java.util.List;
 @Data
 public class ServiceDetailRequest {
     private String courtServiceId;
-    private String courtServiceName;
     private int quantity;
     private BigDecimal price;
 }

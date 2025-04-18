@@ -11,6 +11,7 @@ import vn.pickleball.identityservice.dto.UserRank;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -40,18 +41,9 @@ public class User extends BaseEntity{
     @Column(name = "phone_number", unique = true)
     private String phoneNumber;
 
-    @Column(name = "is_student")
-    private boolean student;
-
     @Column(name = "gender")
     @Enumerated(EnumType.STRING)
     private Gender gender;
-
-    @Column(name = "user_rank")
-    @Enumerated(EnumType.STRING)
-    private UserRank userRank;
-
-    private String courtId;
 
     @ManyToMany
     @JoinTable(
@@ -67,10 +59,13 @@ public class User extends BaseEntity{
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     @JsonManagedReference
-    @JsonIgnore
     private List<Notification> notifications;
 
     private String avatar;
 
     private boolean isActive;
+
+    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "user_id")
+    Set<CourtStaff> courtStaffs = new HashSet<>();
 }

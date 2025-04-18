@@ -24,9 +24,6 @@ import java.util.List;
 public class CourtController {
 
     private final CourtService courtService;
-    private final FirebaseStorageService firebaseStorageService;
-    private final CourtRepository courtRepository;
-
     // Create
     @PostMapping("/create_court")
     public ResponseEntity<CourtResponse> createCourt(@RequestBody CourtRequest courtRequest) {
@@ -104,29 +101,12 @@ public class CourtController {
 
     @PostMapping("/upload-logo")
     public String uploadLogo(@RequestParam String courtId, @RequestParam("file") MultipartFile file) throws IOException {
-        Court court = courtRepository.findById(courtId).orElseThrow(() -> new RuntimeException("Court not found"));
-
-        if (court.getLogoUrl() != null) {
-            firebaseStorageService.deleteFile(court.getLogoUrl());
-        }
-
-        String fileUrl = firebaseStorageService.uploadFile(file, "courts/" + courtId);
-        court.setLogoUrl(fileUrl);
-        courtRepository.save(court);
-        return fileUrl;
+        return courtService.uploadLogo(courtId,file);
     }
 
     @PostMapping("/upload-background")
     public String uploadBackground(@RequestParam String courtId, @RequestParam("file") MultipartFile file) throws IOException {
-        Court court = courtRepository.findById(courtId).orElseThrow(() -> new RuntimeException("Court not found"));
-
-        if (court.getBackgroundUrl() != null) {
-            firebaseStorageService.deleteFile(court.getBackgroundUrl());
-        }
-
-        String fileUrl = firebaseStorageService.uploadFile(file, "courts/" + courtId);
-        court.setBackgroundUrl(fileUrl);
-        courtRepository.save(court);
-        return fileUrl;
+        return courtService.uploadBackground(courtId,file);
     }
+
 }

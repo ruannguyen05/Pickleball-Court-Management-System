@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class AuthenticationService {
-    UserRepository userRepository;
+    UserService userService;
     private final RedisTemplate<String, String> redisTemplate;
 
     @NonFinal
@@ -75,9 +75,7 @@ public class AuthenticationService {
 
     public AuthenticationResponse authenticate(AuthenticationRequest request) {
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
-        var user = userRepository
-                .findByUsernameOrEmailOrPhoneNumber(request.getUsername())
-                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        User user = userService.findByUsernameOrEmailOrPhoneNumber(request.getUsername());
 
         boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
 
@@ -111,7 +109,7 @@ public class AuthenticationService {
 
         var username = signedJWT.getJWTClaimsSet().getSubject();
 
-        var user = userRepository.findByUsername(username).orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+        var user = userService.findByUsername(username);
 
         var token = generateToken(user , true);
 

@@ -30,13 +30,9 @@ public class UserUpdateRequest {
 
     String phoneNumber;
 
-    boolean student;
-
-    UserRank userRank;
-
     Gender gender;
 
-    private String courtId;
+    List<String> courtIds;
 
     private boolean isActive;
 }

@@ -7,8 +7,10 @@ import vn.pickleball.courtservice.entity.Court;
 import java.util.List;
 
 public interface CourtRepository extends JpaRepository<Court, String> {
-    List<Court> findByManagerId(String managerId);
 
     @Query("SELECT c.id FROM Court c")
     List<String> findAllCourtIds();
+
+    @Query("SELECT c FROM Court c WHERE c.isActive = true")
+    List<Court> findAllActiveCourts();
 }

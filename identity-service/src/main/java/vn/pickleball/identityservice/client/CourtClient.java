@@ -4,10 +4,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
-import vn.pickleball.identityservice.dto.request.BookingPaymentRequest;
-import vn.pickleball.identityservice.dto.request.CheckValidMaintenance;
-import vn.pickleball.identityservice.dto.request.CourtServicePurchaseRequest;
-import vn.pickleball.identityservice.dto.request.UpdateBookingSlot;
+import vn.pickleball.identityservice.dto.request.*;
 import vn.pickleball.identityservice.dto.response.CourtPriceResponse;
 
 import java.math.BigDecimal;
@@ -51,5 +48,14 @@ public interface CourtClient {
 
     @GetMapping("/public/court/ids")
     ResponseEntity<List<String>> getCourtIds();
+
+    @GetMapping("/public/getCourtSlot/map")
+    ResponseEntity<List<CourtSlotMap>> getCourtSlotMap(@RequestParam String courtId);
+
+    @GetMapping("/public/getServices/map")
+    ResponseEntity<List<CourtServiceMap>> getServiceMap(@RequestParam String courtId);
+
+    @GetMapping("/public/getCourtMap")
+    ResponseEntity<List<CourtMap>> getAllCourts();
 }
 

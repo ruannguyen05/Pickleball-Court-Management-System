@@ -19,13 +19,12 @@ import java.util.UUID;
 public class CourtImageService {
 
     private final CourtImageRepository courtImageRepository;
-    private final CourtRepository courtRepository;
+    private final CourtService courtService;
     private final FirebaseStorageService firebaseStorageService;
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public CourtImage uploadCourtImage(MultipartFile file, String courtId, boolean isMap) throws IOException {
-        Court court = courtRepository.findById(courtId)
-                .orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court = courtService.getCourtByCourtId(courtId);
 
         if (isMap) {
             List<CourtImage> existingMaps = courtImageRepository.findByCourtIdAndMapImage(courtId, true);

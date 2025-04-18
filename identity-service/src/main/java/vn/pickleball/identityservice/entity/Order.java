@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
-import lombok.Data;
+        import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -19,15 +19,6 @@ public class Order extends BaseEntity{
 
     @Column(nullable = false)
     private String courtId;
-
-    @Column(nullable = false)
-    private String courtName; // Tên sân (ví dụ: "CLB Pickleball Hoàng Thành Trung")
-
-    @Column(nullable = false)
-    private String address; // Địa chỉ sân (ví dụ: "449 Lê Văn Việt quận 9")
-
-//    @Column(nullable = false)
-//    private LocalDate bookingDate; // Ngày đặt sân (ví dụ: "22/02/2025")
 
     @Column(nullable = false)
     private String customerName; // Tên người đặt (ví dụ: "Nguyễn Văn Ruấn")

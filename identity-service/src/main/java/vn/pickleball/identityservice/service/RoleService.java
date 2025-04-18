@@ -24,14 +24,12 @@ public class RoleService {
     RoleRepository roleRepository;
     RoleMapper roleMapper;
 
-    @PreAuthorize("hasRole('ADMIN')")
     public RoleResponse create(RoleRequest request) {
         var role = roleMapper.toRole(request);
 
         role = roleRepository.save(role);
         return roleMapper.toRoleResponse(role);
     }
-    @PreAuthorize("hasRole('ADMIN')")
     public List<Role> getRolesWithoutAdmin() {
         return roleRepository.findRolesWithoutAdmin("ADMIN");
     }
@@ -45,12 +43,25 @@ public class RoleService {
         roleRepository.save(role);
         return roleMapper.toRoleResponse(role);
     }
-    @PreAuthorize("hasRole('ADMIN')")
+
     public List<RoleResponse> getAll() {
         return roleRepository.findRolesWithoutAdmin("ADMIN").stream().map(roleMapper::toRoleResponse).toList();
     }
 
     public void delete(String role) {
         roleRepository.deleteById(role);
+    }
+
+
+
+    public HashSet<Role> getRole(String role){
+        HashSet<Role> roles = new HashSet<>();
+        roleRepository.findById(role).ifPresent(roles::add);
+
+        return roles;
+    }
+
+    public List<Role> getAllByIds (List<String> roles){
+        return roleRepository.findAllById(roles);
     }
 }

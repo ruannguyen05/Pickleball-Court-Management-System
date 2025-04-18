@@ -36,20 +36,15 @@ public class CourtPriceService {
 
     private final CourtPriceRepository courtPriceRepository;
 
-    private final TimeSlotRepository timeSlotRepository;
+    private final TimeSlotService timeSlotService;
 
-    private final CourtRepository courtRepository;
-
-    private final CourtPriceMapper courtPriceMapper;
+    private final CourtService courtService;
 
     private final TimeSlotMapper timeSlotMapper;
 
-    private final BookingSlotService bookingSlotService;
-
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtPriceRequest.courtId)")
     public CourtPriceResponse createOrUpdateCourtPrice(CourtPriceRequest courtPriceRequest) {
-        Court court = courtRepository.findById(courtPriceRequest.getCourtId())
-                .orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court = courtService.getCourtByCourtId(courtPriceRequest.getCourtId());
         if(courtPriceRequest.getWeekendTimeSlots()!= null) {
             // Xử lý WEEKDAY
             List<TimeSlot> updatedWeekdayTimeSlots = processTimeSlots(
@@ -70,7 +65,7 @@ public class CourtPriceService {
             response.setCourtId(court.getId());
             response.setWeekdayTimeSlots(timeSlotMapper.toTimeSlotResponseList(updatedWeekdayTimeSlots));
             response.setWeekendTimeSlots(timeSlotMapper.toTimeSlotResponseList(updatedWeekendTimeSlots));
-            bookingSlotService.deleteBookingSlotsByCourtId(court.getId());
+            courtService.deleteBookingSlotsByCourtId(court.getId());
             return response;
         }else{
             List<TimeSlot> updatedWeekdayTimeSlots = processTimeSlots(
@@ -81,7 +76,7 @@ public class CourtPriceService {
             CourtPriceResponse response = new CourtPriceResponse();
             response.setCourtId(court.getId());
             response.setWeekdayTimeSlots(timeSlotMapper.toTimeSlotResponseList(updatedWeekdayTimeSlots));
-            bookingSlotService.deleteBookingSlotsByCourtId(court.getId());
+            courtService.deleteBookingSlotsByCourtId(court.getId());
             return response;
         }
 
@@ -142,11 +137,11 @@ public class CourtPriceService {
 
         // Xóa các TimeSlot không còn tồn tại
         if (!existingTimeSlotMap.isEmpty()) {
-            timeSlotRepository.deleteAll(existingTimeSlotMap.values());
+            timeSlotService.deleteAllTimeSlots((List<TimeSlot>) existingTimeSlotMap.values());
         }
 
         // Lưu các TimeSlot mới hoặc đã cập nhật
-        return timeSlotRepository.saveAll(updatedTimeSlots);
+        return timeSlotService.saveAll(updatedTimeSlots);
     }
 
 
@@ -170,7 +165,7 @@ public class CourtPriceService {
     }
 
     public CourtPriceResponse getCourtPriceByCourtId(String courtId) {
-        List<TimeSlot> timeSlots = timeSlotRepository.findByCourtIdOrderByStartTimeAsc(courtId);
+        List<TimeSlot> timeSlots = timeSlotService.findByCourtIdOrderByStartTimeAsc(courtId);
 
         CourtPriceResponse response = new CourtPriceResponse();
         response.setCourtId(courtId);
@@ -246,5 +241,9 @@ public class CourtPriceService {
             currentTime = currentTime.plusMinutes(30);
         }
         return timeSlots;
+    }
+
+    public List<CourtPrice> getByCourtId(String courtId){
+        return courtPriceRepository.findByCourtId(courtId);
     }
 }

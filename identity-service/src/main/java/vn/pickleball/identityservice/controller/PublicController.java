@@ -9,10 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import vn.pickleball.identityservice.dto.payment.MbVietQrRefundWithAmountRequest;
 import vn.pickleball.identityservice.dto.request.*;
 import vn.pickleball.identityservice.dto.response.*;
-import vn.pickleball.identityservice.service.EmailService;
-import vn.pickleball.identityservice.service.FCMService;
-import vn.pickleball.identityservice.service.NotificationService;
-import vn.pickleball.identityservice.service.OrderService;
+import vn.pickleball.identityservice.service.*;
 import vn.pickleball.identityservice.utils.GenerateString;
 
 import java.math.BigDecimal;
@@ -29,6 +26,7 @@ public class PublicController {
     private final OrderService orderService;
     private final FCMService fcmService;
     private final NotificationService notificationService;
+    private final UserService userService;
     private final EmailService emailService;
 
     @PostMapping("/create_order")
@@ -166,7 +164,7 @@ public class PublicController {
 
     @PostMapping("/noti/maintenance")
     public ResponseEntity<String> sendMaintenanceNotification(@RequestParam String courtId, @RequestParam String courtSlotId) {
-        orderService.sendNotiMaintenance(courtId, courtSlotId);
+        notificationService.sendNotiMaintenance(courtId, courtSlotId);
         return ResponseEntity.ok("Maintenance notification sent successfully");
     }
 
@@ -178,6 +176,11 @@ public class PublicController {
     @GetMapping("/getTransactionHistory")
     public List<TransactionHistory> getTransactionHistory(@RequestParam String orderId){
         return orderService.getTransactionHistory(orderId);
+    }
+
+    @GetMapping("/getCourtIdsByUserId")
+    public List<String> getCourtIdsByUserId(@RequestParam String userid){
+        return userService.getCourtsByUserId(userid);
     }
 
 }

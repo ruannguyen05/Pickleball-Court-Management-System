@@ -4,18 +4,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import feign.FeignException;
-import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import vn.pickleball.identityservice.client.CourtClient;
 import vn.pickleball.identityservice.client.PaymentClient;
@@ -39,7 +37,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -56,7 +53,7 @@ import java.util.stream.Collectors;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final TransactionRepository transactionRepository;
+    private final TransactionService transactionService;
     private final OrderMapper orderMapper;
     private final PaymentClient paymentClient;
     private final CourtClient courtClient;
@@ -67,10 +64,11 @@ public class OrderService {
     private final TransactionMapper transactionMapper;
     private final FCMService fcmService;
     private final NotificationService notificationService;
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final EmailService emailService;
-    private final OrderDetailRepository orderDetailRepository;
-    private final BookingDateRepository bookingDateRepository;
+    private final OrderDetailService orderDetailService;
+    private final BookingDateService bookingDateService;
+    private final OrderMapCustom orderMapCustom;
 
     private static final String TRANSACTION_KEY_PREFIX = "transaction:";
     private static final String PREFIX = "bookingslot:";
@@ -94,7 +92,7 @@ public class OrderService {
             throw new ApiException("Payment amount not match", "AMOUNT_NOT_MATCH");
         }
 
-        Order order = orderMapper.toOrder(request);
+        Order order = orderMapper.toOrderEntity(request);
 
         order.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
         order.setTotalAmount(request.getTotalAmount());
@@ -103,7 +101,7 @@ public class OrderService {
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn ngày");
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa đặt cọc");
         if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-            order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> null));
+            order.setUser(userService.findById(request.getUserId()));
         }
 //        LocalTime latestEndTime = Collections.max(request.getOrderDetails(),
 //                        Comparator.comparing(OrderDetailRequest::getEndTime))
@@ -155,7 +153,7 @@ public class OrderService {
         // Lên lịch kiểm tra sau 5 phút
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapper.toOrderResponse(savedOrder);
+        OrderResponse response = orderMapCustom.toOrderResponse(savedOrder);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
@@ -186,9 +184,9 @@ public class OrderService {
 
         // Xóa toàn bộ OrderDetail và BookingDate cũ thủ công
         for (OrderDetail detail : order.getOrderDetails()) {
-            bookingDateRepository.deleteByOrderDetailId(detail.getId()); // Xóa BookingDate
+            bookingDateService.deleteByOrderDetailId(detail.getId()); // Xóa BookingDate
         }
-        orderDetailRepository.deleteByOrderId(order.getId());
+        orderDetailService.deleteByOrderId(order.getId());
         order.getOrderDetails().clear();
         // Cập nhật Order từ request
         orderMapper.updateOrderFromRequest(request, order);
@@ -202,8 +200,7 @@ public class OrderService {
         order.setDepositAmount(request.getDepositAmount());
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn ngày");
         if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-            order.setUser(userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new ApiException("User not found", "USER_NOT_FOUND")));
+            order.setUser(userService.findById(request.getUserId()));
         }
 
         // Lưu Order để đồng bộ hóa
@@ -254,7 +251,7 @@ public class OrderService {
             schedulePaymentCheck(billCode);
 
             Order finalOrder = orderRepository.save(savedOrder);
-            OrderResponse response = orderMapper.toOrderResponse(finalOrder);
+            OrderResponse response = orderMapCustom.toOrderResponse(finalOrder);
             response.setQrcode(qrCodeResponse.getQrCode());
             redisTemplate.opsForValue().set(PREFIX_QR + finalOrder.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
 
@@ -295,7 +292,7 @@ public class OrderService {
                     throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
-            return orderMapper.toOrderResponse(finalOrder);
+            return orderMapCustom.toOrderResponse(finalOrder);
         } else {
             savedOrder.setOrderStatus("Thay đổi lịch đặt thành công");
             Order finalOrder = orderRepository.save(savedOrder);
@@ -310,13 +307,8 @@ public class OrderService {
                     throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
-            return orderMapper.toOrderResponse(finalOrder);
+            return orderMapCustom.toOrderResponse(finalOrder);
         }
-    }
-
-    private void deleteOldOrderDetail(Order order) {
-        orderDetailRepository.deleteAll(order.getOrderDetails());
-        orderRepository.save(order);
     }
 
     /**
@@ -354,9 +346,9 @@ public class OrderService {
         order.setOrderStatus(orderStatus);
         orderRepository.save(order);
         if (order.getOrderStatus().equals("Đặt lịch thành công") || order.getOrderType().equals("Đơn dịch vụ")) {
-            sendNoti("Thanh toán thất bại", "Đã hết thời gian chờ thanh toán, vui lòng kiểm tra lại đặt lịch.", order);
+            notificationService.sendNoti("Thanh toán thất bại", "Đã hết thời gian chờ thanh toán, vui lòng kiểm tra lại đặt lịch.", order);
         } else {
-            sendNoti(orderStatus.toUpperCase(), "Lịch của bạn đã bị hủy do quá thời gian chờ thanh toán.", order);
+            notificationService.sendNoti(orderStatus.toUpperCase(), "Lịch của bạn đã bị hủy do quá thời gian chờ thanh toán.", order);
         }
         log.info("Order {} has been cancelled due to payment timeout.", order.getId());
         log.info("Update order status");
@@ -406,14 +398,12 @@ public class OrderService {
                     .billCode(response.getData().getReferenceLabelCode())
                     .ftCode(response.getData().getFtCode())
                     .createDate(LocalDateTime.now())
-                    .status("Thành công")
-                    .courtId(order.getCourtId())
                     .build();
-            transactionRepository.save(transaction);
+            transactionService.saveTransaction(transaction);
             if (order.getUser() != null && !order.getOrderType().equals("Đơn cố định")) {
                 String email = order.getUser().getEmail();
                 if (email != null) {
-                    emailService.sendBookingConfirmationEmail(email, orderMapper.toOrderResponse(order));
+                    emailService.sendBookingConfirmationEmail(email, orderMapCustom.toOrderResponse(order));
                 }
             }
 
@@ -421,7 +411,7 @@ public class OrderService {
                 courtClient.synchronous(order.getCourtId());
             }
             if (order.getOrderStatus().equals("Thay đổi lịch đặt thành công")) {
-                sendNoti(orderStatus.toUpperCase(), "Thanh toán đặt lịch thành công, vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
+                notificationService.sendNoti(orderStatus.toUpperCase(), "Thanh toán đặt lịch thành công, vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
             } else if (order.getOrderType().equals("Đơn dịch vụ")) {
                 try {
                     List<ServiceDetailEntity> serviceDetailEntities = order.getServiceDetails();
@@ -429,10 +419,10 @@ public class OrderService {
                 }catch (FeignException e){
                     throw new ApiException("Fail to update quantity", "ERROR_UPDATE_QUANTITY");
                 }
-                sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có đơn đặt mới của khách , kiểm tra yêu cầu của khách", order);
+                notificationService.sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có đơn đặt mới của khách , kiểm tra yêu cầu của khách", order);
             } else {
-                sendNoti(orderStatus.toUpperCase(), "Cảm ơn bạn đã đặt lịch , vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
-                sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có lịch đặt mới hãy kiểm tra lịch đặt của khách", order);
+                notificationService.sendNoti(orderStatus.toUpperCase(), "Cảm ơn bạn đã đặt lịch , vui lòng kiểm tra lịch đặt và đến sân đúng giờ", order);
+                notificationService.sendNotiManagerAndStaff("BẠN CÓ " + orderStatus.toUpperCase(), "Bạn có lịch đặt mới hãy kiểm tra lịch đặt của khách", order);
             }
             deleteTransactionRedis(response.getData().getReferenceLabelCode());
             redisTemplate.delete(PREFIX_QR + order.getId());
@@ -480,65 +470,7 @@ public class OrderService {
 //        deleteTransactionRedis(paymentData.getBillCode());
 //    }
 
-    public void sendNoti(String title, String des, Order order) {
-        List<String> fcmTokens = order.getUser() != null ? fcmService.getTokens(order.getUser().getId()) : fcmService.getTokens(order.getPhoneNumber());
-        if (fcmTokens == null || fcmTokens.isEmpty()) fcmTokens = fcmService.getTokens(order.getPhoneNumber());
-        NotificationRequest notificationRequest = NotificationRequest.builder()
-                .title(title)
-                .description(des)
-                .createAt(LocalDateTime.now())
-                .status("send")
-                .notificationData(NotiData.builder()
-                        .orderId(order.getId())
-                        .build())
-                .build();
-        NotificationRequest notification = notificationService.saveNotification(notificationRequest, order.getPhoneNumber());
-        fcmService.sendNotification(fcmTokens, notification);
-    }
 
-    public void sendNotiManagerAndStaff(String title, String des, Order order) {
-        List<User> users = userRepository.findByCourtId(order.getCourtId());
-
-        for (User user : users) {
-            List<String> fcmTokens = fcmService.getTokens(user.getId());
-
-            NotificationRequest notificationRequest = NotificationRequest.builder()
-                    .title(title)
-                    .description(des)
-                    .createAt(LocalDateTime.now())
-                    .status("send")
-                    .notificationData(NotiData.builder()
-                            .orderId(order.getId())
-                            .build())
-                    .build();
-
-            NotificationRequest notification = notificationService.saveNotificationManagerAndStaff(notificationRequest, user);
-
-            fcmService.sendNotification(fcmTokens, notification);
-        }
-    }
-
-    public void sendNotiMaintenance(String courtId, String courtSlotId) {
-        List<User> users = userRepository.findByCourtId(courtId);
-
-        for (User user : users) {
-            List<String> fcmTokens = fcmService.getTokens(user.getId());
-
-            NotificationRequest notificationRequest = NotificationRequest.builder()
-                    .title("Kiểm tra lịch bảo trì")
-                    .description("Đến lịch bảo trì , kiểm tra lịch bảo trì")
-                    .createAt(LocalDateTime.now())
-                    .status("send")
-                    .notificationData(NotiData.builder()
-                            .orderId(courtSlotId)
-                            .build())
-                    .build();
-
-            NotificationRequest notification = notificationService.saveNotificationManagerAndStaff(notificationRequest, user);
-
-            fcmService.sendNotification(fcmTokens, notification);
-        }
-    }
 
     public static String encrypt(Double amount, String billCode, String checksumKey) {
         try {
@@ -615,11 +547,11 @@ public class OrderService {
 
         orders = orderRepository.findByPhoneNumberOrUserId(value);
 
-        return orderMapper.toOrderResponses(orders);
+        return orderMapCustom.toOrderResponses(orders);
     }
 
     public OrderResponse getOrderById(String oid) {
-        OrderResponse response = orderMapper.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
+        OrderResponse response = orderMapCustom.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
         response.setQrcode(redisTemplate.opsForValue().get(PREFIX_QR + oid));
         return response;
     }
@@ -656,10 +588,10 @@ public class OrderService {
             }
         }
         orderRepository.save(order);
-        sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
-        sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
+        notificationService.sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
+        notificationService.sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
         deleteTransactionRedis(order.getBillCode());
-        return orderMapper.toOrderResponse(order);
+        return orderMapCustom.toOrderResponse(order);
     }
 
     public void testFcm(String key) {
@@ -692,16 +624,6 @@ public class OrderService {
         return orderMapper.mapToUpdateBookingSlot(orders, bookingDate);
     }
 
-
-//    public List<OrderDetail> getOrderDetailsByBookingDate(LocalDate bookingDate) {
-//        return orderDetailRepository.findAllByBookingDate(bookingDate);
-//    }
-
-//    public List<Order> getUnsettledOrders() {
-//        return orderRepository.findByOrderStatusNotAndPaymentStatusAndSettlementTimeLessThanEqual(
-//                "Đã hoàn thành", "Đã thanh toán", LocalDateTime.now()
-//        );
-//    }
 
     public List<Order> getOrderRefund() {
         return orderRepository.findByPaymentStatus("Đợi hoàn tiền");
@@ -790,10 +712,8 @@ public class OrderService {
                         .paymentStatus("Hoàn tiền")
                         .billCode(transaction.getBillCode())
                         .createDate(LocalDateTime.now())
-                        .status("Hoàn tiền thành công")
-                        .courtId(order.getCourtId())
                         .build();
-                transactionRepository.save(refundLog);
+                transactionService.saveTransaction(refundLog);
 
             } catch (ApiException e) {
                 throw new ApiException("Refund thất bại cho billCode: " + transaction.getBillCode(), "API_MB_REFUND_ERROR");
@@ -807,15 +727,15 @@ public class OrderService {
 
     public void saveRefundFailure(Order order) {
         order.setPaymentStatus("Hoàn tiền thất bại");
-        sendNoti("HOÀN TIỀN THẤT BẠI", "Vui lòng liên hệ chúng tôi để được hỗ trợ.", order);
-        sendNotiManagerAndStaff("HOÀN TIỀN THẤT BẠI", "Kiểm tra đơn hàng và trạng thái hoàn tiền", order);
+        notificationService.sendNoti("HOÀN TIỀN THẤT BẠI", "Vui lòng liên hệ chúng tôi để được hỗ trợ.", order);
+        notificationService.sendNotiManagerAndStaff("HOÀN TIỀN THẤT BẠI", "Kiểm tra đơn hàng và trạng thái hoàn tiền", order);
     }
 
     public void saveRefundSuccess(Order order, BigDecimal refundAmount) {
         order.setPaymentStatus("Đã hoàn tiền");
         order.setAmountRefund(refundAmount);
-        sendNoti("HOÀN TIỀN THÀNH CÔNG", "Chúng tôi đã hoàn " + refundAmount + ", vui lòng kiểm tra tài khoản.", order);
-        sendNotiManagerAndStaff("HOÀN TIỀN THÀNH CÔNG", "Kiểm tra đơn hàng và số tiền đã hoàn", order);
+        notificationService.sendNoti("HOÀN TIỀN THÀNH CÔNG", "Chúng tôi đã hoàn " + refundAmount + ", vui lòng kiểm tra tài khoản.", order);
+        notificationService.sendNotiManagerAndStaff("HOÀN TIỀN THÀNH CÔNG", "Kiểm tra đơn hàng và số tiền đã hoàn", order);
     }
 
 
@@ -903,7 +823,7 @@ public class OrderService {
 
 
     public List<Transaction> findUniqueBillCodeTransactions(String orderId) {
-        List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
+        List<Transaction> transactions = transactionService.findByOrderId(orderId);
 
         // Đếm số lần xuất hiện của mỗi billCode
         Map<String, Long> billCodeCount = transactions.stream()
@@ -998,14 +918,12 @@ public class OrderService {
         order.setCustomerName(request.getCustomerName());
         order.setPhoneNumber(request.getPhoneNumber());
         order.setCourtId(request.getCourtId());
-        order.setCourtName(request.getCourtName());
-        order.setAddress(request.getAddress());
         order.setOrderStatus("Đang xử lý");
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn cố định");
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa thanh toán");
         order.setNote(request.getNote());
         if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-            order.setUser(userRepository.findById(request.getUserId()).orElseThrow(() -> new ApiException("User not found","ENTITY_NOTFOUND")));
+            order.setUser(userService.findById(request.getUserId()));
         }
 
         // Lưu order trước để có ID
@@ -1031,7 +949,6 @@ public class OrderService {
                 OrderDetail orderDetail = new OrderDetail();
                 orderDetail.setOrder(order);
                 orderDetail.setCourtSlotId(courtSlotId);
-                orderDetail.setCourtSlotName(courtSlotName);
                 orderDetail.setStartTime(request.getStartTime());
                 orderDetail.setEndTime(request.getEndTime());
                 orderDetail.setPrice(null);
@@ -1057,7 +974,6 @@ public class OrderService {
                     OrderDetail flexibleDetail = new OrderDetail();
                     flexibleDetail.setOrder(order);
                     flexibleDetail.setCourtSlotId(fixedCourtSlotId);
-                    flexibleDetail.setCourtSlotName(fixedCourtSlotName);
                     flexibleDetail.setStartTime(request.getStartTime());
                     flexibleDetail.setEndTime(request.getEndTime());
                     flexibleDetail.setPrice(null);
@@ -1072,7 +988,7 @@ public class OrderService {
             }
         }
 
-        orderDetailRepository.saveAll(allOrderDetails);
+        orderDetailService.saveAll(allOrderDetails);
 
         BigDecimal amount = courtClient.calculateTotalPayment(BookingPaymentRequest.builder()
                 .courtId(request.getCourtId())
@@ -1111,7 +1027,7 @@ public class OrderService {
         saveTransactionToRedis(transaction);
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapper.toOrderResponse(order);
+        OrderResponse response = orderMapCustom.toOrderResponse(order);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
@@ -1165,42 +1081,6 @@ public class OrderService {
     }
 
 
-    public List<OrderResponse> getOrdersByBookingDateAndTimeRange(
-            LocalDate bookingDate,
-            LocalTime startTime,
-            LocalTime endTime) {
-
-        List<String> statuses = Arrays.asList(
-                "Đặt lịch thành công",
-                "Thay đổi lịch đặt thành công",
-                "Đã sử dụng lịch đặt");
-
-        List<Order> orders = orderRepository.findOrdersWithDetailsByBookingDateAndTimeRange(
-                bookingDate,
-                getCourtIdManage(),
-                statuses,
-                startTime,
-                endTime);
-
-        return orderMapper.toOrderResponses(orders);
-    }
-
-
-    public List<OrderResponse> getOrdersByBookingDateAndPhoneNumberWithStatus(
-            LocalDate bookingDate,
-            String phoneNumber) {
-
-
-        List<String> statuses = Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công" , "Đã hoàn thành" , "Đã sử dụng lịch đặt" , "Không sử dụng lịch đặt");
-        List<Order> orders = orderRepository.findByBookingDateAndPhoneNumberWithStatus(
-                bookingDate != null ? bookingDate : LocalDate.now(),
-                phoneNumber,
-                getCourtIdManage(),
-                statuses);
-
-        return orderMapper.toOrderResponses(orders);
-    }
-
     public OrderPage getOrdersByFilterByStaff(
             LocalDate bookingDate,
             LocalTime startTime,
@@ -1245,7 +1125,7 @@ public class OrderService {
                 pageable
         );
 
-        List<OrderData> orderData = orderMapper.toDatas(orders.getContent());
+        List<OrderData> orderData = orderMapCustom.toOrderDataList(orders.getContent());
 
         return OrderPage.builder()
                 .orders(orderData)
@@ -1255,12 +1135,8 @@ public class OrderService {
     }
 
 
-    private String getCourtIdManage (){
-        boolean isStaff = SecurityContextUtil.isStaff();
-        if(isStaff) throw new ApiException("","STAFF_UNAUTH");
-        User manager = userRepository.findById(SecurityContextUtil.getUid()).orElseThrow(() -> new ApiException("manager unauthorize","MANAGER_UNAUTHORIZE"));
-
-        return manager.getCourtId();
+    private List<String> getCourtIdManage (){
+        return userService.getCourtsByUserId(SecurityContextUtil.getUid());
     }
 
     public OrderResponse checkin(String orderId){
@@ -1275,7 +1151,7 @@ public class OrderService {
         order.setOrderStatus("Đã sử dụng lịch đặt");
         orderRepository.save(order);
 
-        return orderMapper.toOrderResponse(order);
+        return orderMapCustom.toOrderResponse(order);
     }
 
     public void updateExpiredOrdersStatus() {
@@ -1337,9 +1213,7 @@ public class OrderService {
 
         // Set user if provided
         if (request.getUserId() != null && !request.getUserId().isEmpty()) {
-            User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new ApiException("User not found","USER_NOT_FOUND"));
-            order.setUser(user);
+            order.setUser(userService.findById(request.getUserId()));
         }
 
         // Calculate total amount from services
@@ -1395,7 +1269,7 @@ public class OrderService {
         saveTransactionToRedis(transaction);
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapper.toOrderResponse(order);
+        OrderResponse response = orderMapCustom.toOrderResponse(order);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
@@ -1403,16 +1277,120 @@ public class OrderService {
 
 
     public List<TransactionHistory> getTransactionHistory(String orderId) {
-        List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
+        List<Transaction> transactions = transactionService.findByOrderId(orderId);
 
         return transactions.stream().map(transaction -> {
             TransactionHistory history = new TransactionHistory();
             history.setPaymentStatus(transaction.getPaymentStatus());
             history.setAmount(transaction.getAmount());
-            history.setStatus(transaction.getStatus());
             history.setCreateDate(transaction.getCreateDate());
             return history;
         }).collect(Collectors.toList());
+    }
+
+    public List<Order> findByOrderStatusInAndBookingDate(List<String> status , LocalDate date){
+        return orderRepository.findByOrderStatusInAndBookingDate(status,date);
+    }
+
+    public Page<Order> getOrders(
+            List<String> courtIds,
+            String orderType,
+            String orderStatus,
+            String paymentStatus,
+            LocalDate startDate,
+            LocalDate endDate,
+            int page,
+            int size
+    ) {
+        PageRequest pageable = PageRequest.of(page - 1, size);
+        return orderRepository.findOrders(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate, pageable
+        );
+    }
+
+    public List<Order> searchOrdersRevenue(RevenueSummaryRequest request) {
+        Specification<Order> spec = Specification.where(
+                OrderSpecification.hasBookingDateBetween(
+                        request.getDateRange().getStartDate(),
+                        request.getDateRange().getEndDate()
+                )
+        ).and(OrderSpecification.hasOrderStatusIn(
+                request.getFilters().getOrderStatus() != null
+                        ? request.getFilters().getOrderStatus()
+                        : Arrays.asList(
+                        "Đặt lịch thành công",
+                        "Thay đổi lịch đặt thành công",
+                        "Đã hoàn thành",
+                        "Đã sử dụng lịch đặt",
+                        "Không sử dụng lịch đặt",
+                        "Đặt dịch vụ tại sân thành công"
+                )
+        )).and(OrderSpecification.hasPaymentStatusIn(
+                request.getFilters().getPaymentStatus()
+        )).and(OrderSpecification.hasCourtIdIn(
+                request.getFilters().getCourtIds()
+        )).and(OrderSpecification.hasOrderTypeIn(
+                request.getFilters().getOrderTypes()
+        ));
+
+        return orderRepository.findAll(spec);
+    }
+
+    public List<Order> fetchBookings(List<String> courtIds, DateRange dateRange) {
+        Specification<Order> spec = Specification.where(
+                OrderSpecification.hasBookingDateBetween(
+                        dateRange.getStartDate(),
+                        dateRange.getEndDate()
+                )
+        ).and(OrderSpecification.hasOrderStatusIn(Arrays.asList(
+                "Đặt lịch thành công",
+                "Thay đổi lịch đặt thành công",
+                "Đã hoàn thành",
+                "Đã sử dụng lịch đặt",
+                "Không sử dụng lịch đặt"
+        )));
+
+        if (courtIds != null) {
+            spec = spec.and(OrderSpecification.hasCourtIdIn(courtIds));
+        }
+
+        return orderRepository.findAll(spec);
+    }
+
+    public List<Order> findOrdersByFilters(
+            List<String> courtIds,
+            String orderType,
+            String orderStatus,
+            String paymentStatus,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        return orderRepository.findOrdersByFilters(
+                (courtIds != null && !courtIds.isEmpty()) ? courtIds : null,
+                orderType,
+                orderStatus,
+                paymentStatus,
+                startDate,
+                endDate
+        );
+    }
+
+    public void checkAndSendUpcomingBookingNotifications() {
+        // 1. Lấy ngày hiện tại
+        LocalDate today = LocalDate.now();
+        LocalTime now = LocalTime.now();
+
+        // 2. Tìm các đơn hàng thỏa điều kiện
+        List<Order> orders = findByOrderStatusInAndBookingDate(
+                Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công"),
+                today
+        );
+
+        // 3. Xử lý từng đơn hàng
+        if (orders != null && !orders.isEmpty()) {
+            for (Order order : orders) {
+                notificationService.processOrderForNotifications(order, now);
+            }
+        }
     }
 
 

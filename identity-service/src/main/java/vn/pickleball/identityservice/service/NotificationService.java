@@ -6,10 +6,8 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.pickleball.identityservice.dto.request.NotiData;
 import vn.pickleball.identityservice.dto.request.NotificationRequest;
 import vn.pickleball.identityservice.dto.response.NotificationResponse;
-import vn.pickleball.identityservice.entity.Notification;
-import vn.pickleball.identityservice.entity.Order;
-import vn.pickleball.identityservice.entity.OrderDetail;
-import vn.pickleball.identityservice.entity.User;
+import vn.pickleball.identityservice.dto.response.OrderResponse;
+import vn.pickleball.identityservice.entity.*;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.NotificationMapper;
 import vn.pickleball.identityservice.mapper.OrderMapper;
@@ -25,7 +23,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,23 +31,65 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final NotificationMapper notificationMapper;
-    private final UserRepository userRepository;
-    private final OrderRepository orderRepository;
+    private final UserService userService;
     private final FCMService fcmService;
-    private final OrderMapper orderMapper;
     private final EmailService emailService;
+    private final OrderMapCustom orderMapCustom;
 
     // Lưu thông báo mới
     public NotificationRequest saveNotification(NotificationRequest request, String phoneNumber) {
-        User user = userRepository.findByIdOrPhoneNumber(phoneNumber)
-                .orElse(null);
-
         Notification notification = notificationMapper.toEntity(request);
-        notification.setUser(user);
         notification.setPhoneNumber(phoneNumber);
-        notification.setCreateAt(LocalDateTime.now());
 
+        userService.findByPhoneNumber(phoneNumber).ifPresent(notification::setUser);
+
+        notification.setCreateAt(LocalDateTime.now());
         return notificationMapper.toDto(notificationRepository.save(notification));
+    }
+
+
+    public void sendNotiManagerAndStaff(String title, String des, Order order) {
+        List<String> users = userService.getUsersByCourtId(order.getCourtId());
+
+        for (String user : users) {
+            List<String> fcmTokens = fcmService.getTokens(user);
+
+            NotificationRequest notificationRequest = NotificationRequest.builder()
+                    .title(title)
+                    .description(des)
+                    .createAt(LocalDateTime.now())
+                    .status("send")
+                    .notificationData(NotiData.builder()
+                            .orderId(order.getId())
+                            .build())
+                    .build();
+
+            NotificationRequest notification = saveNotificationManagerAndStaff(notificationRequest, userService.findById(user));
+
+            fcmService.sendNotification(fcmTokens, notification);
+        }
+    }
+
+    public void sendNotiMaintenance(String courtId, String courtSlotId) {
+        List<String> users = userService.getUsersByCourtId(courtId);
+
+        for (String user : users) {
+            List<String> fcmTokens = fcmService.getTokens(user);
+
+            NotificationRequest notificationRequest = NotificationRequest.builder()
+                    .title("Kiểm tra lịch bảo trì")
+                    .description("Đến lịch bảo trì , kiểm tra lịch bảo trì")
+                    .createAt(LocalDateTime.now())
+                    .status("send")
+                    .notificationData(NotiData.builder()
+                            .orderId(courtSlotId)
+                            .build())
+                    .build();
+
+            NotificationRequest notification = saveNotificationManagerAndStaff(notificationRequest, userService.findById(user));
+
+            fcmService.sendNotification(fcmTokens, notification);
+        }
     }
 
     public NotificationRequest saveNotificationManagerAndStaff(NotificationRequest request, User user) {
@@ -87,26 +126,8 @@ public class NotificationService {
         return notificationRepository.countUnreadByIdOrPhoneNumber(value);
     }
 
-    public void checkAndSendUpcomingBookingNotifications() {
-        // 1. Lấy ngày hiện tại
-        LocalDate today = LocalDate.now();
-        LocalTime now = LocalTime.now();
 
-        // 2. Tìm các đơn hàng thỏa điều kiện
-        List<Order> orders = orderRepository.findByOrderStatusInAndBookingDate(
-                Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công"),
-                today
-        );
-
-        // 3. Xử lý từng đơn hàng
-        if (orders != null && !orders.isEmpty()) {
-            for (Order order : orders) {
-                processOrderForNotifications(order, now);
-            }
-        }
-    }
-
-    private void processOrderForNotifications(Order order, LocalTime now) {
+    public void processOrderForNotifications(Order order, LocalTime now) {
         // 1. Lọc các chi tiết đặt sân của hôm nay
         List<OrderDetail> todaysDetails = order.getOrderDetails().stream()
                 .filter(od -> od.getBookingDates().stream()
@@ -127,9 +148,10 @@ public class NotificationService {
 
     private void sendUpcomingBookingNotification(Order order, OrderDetail detail) {
         String title = "Bạn có lịch đặt sân sắp tới giờ";
+        OrderResponse orderResponse = orderMapCustom.toOrderResponse(order);
         String description = String.format(
                 "Bạn có lịch đặt sân %s sử dụng lúc %s",
-                order.getCourtName(),
+                orderResponse.getCourtName(),
                 detail.getStartTime()
         );
         sendNoti(title, description, order);
@@ -137,7 +159,7 @@ public class NotificationService {
         if (order.getUser() != null) {
             String email = order.getUser().getEmail();
             if (email != null) {
-                emailService.sendBookingRemindEmail(email, orderMapper.toOrderResponse(order));
+                emailService.sendBookingRemindEmail(email, orderResponse);
             }
         }
     }
@@ -157,5 +179,7 @@ public class NotificationService {
         NotificationRequest notification = this.saveNotification(notificationRequest, order.getPhoneNumber());
         fcmService.sendNotification(fcmTokens, notification);
     }
+
+
 
 }

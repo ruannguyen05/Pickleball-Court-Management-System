@@ -26,7 +26,7 @@ public interface OrderMapper {
     @Mapping(target = "paymentStatus", constant = "Chưa đặt cọc")
     @Mapping(target = "orderStatus", constant = "Đang xử lý")
     @Mapping(target = "amountPaid", ignore = true)
-    Order toOrder(OrderRequest request);
+    Order toOrderEntity(OrderRequest request);
 
 
     @Mapping(target = "id", ignore = true) // ID được tạo tự động
@@ -75,85 +75,91 @@ public interface OrderMapper {
         }
     }
 
-    default List<OrderDetailRequest> mapOrderDetails(List<OrderDetail> orderDetails) {
-        if (orderDetails == null || orderDetails.isEmpty()) {
-            return Collections.emptyList();
-        }
+//    default List<OrderDetailRequest> mapOrderDetails(List<OrderDetail> orderDetails) {
+//        if (orderDetails == null || orderDetails.isEmpty()) {
+//            return Collections.emptyList();
+//        }
+//
+//        Map<LocalDate, List<OrderDetailDto>> groupedByDate = orderDetails.stream()
+//                .flatMap(orderDetail -> orderDetail.getBookingDates().stream()
+//                        .map(bookingDate -> new AbstractMap.SimpleEntry<>(bookingDate.getBookingDate(),
+//                                new OrderDetailDto(
+//                                        orderDetail.getCourtSlotId(),
+//                                        ,
+//                                        orderDetail.getStartTime(),
+//                                        orderDetail.getEndTime(),
+//                                        orderDetail.getPrice()
+//                                )
+//                        ))
+//                )
+//                .collect(Collectors.groupingBy(Map.Entry::getKey,
+//                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
+//
+//        return groupedByDate.entrySet().stream()
+//                .map(entry -> {
+//                    OrderDetailRequest request = new OrderDetailRequest();
+//                    request.setBookingDate(entry.getKey());
+//                    request.setBookingSlots(entry.getValue());
+//                    return request;
+//                })
+//                .collect(Collectors.toList());
+//    }
 
-        Map<LocalDate, List<OrderDetailDto>> groupedByDate = orderDetails.stream()
-                .flatMap(orderDetail -> orderDetail.getBookingDates().stream()
-                        .map(bookingDate -> new AbstractMap.SimpleEntry<>(bookingDate.getBookingDate(),
-                                new OrderDetailDto(
-                                        orderDetail.getCourtSlotId(),
-                                        orderDetail.getCourtSlotName(),
-                                        orderDetail.getStartTime(),
-                                        orderDetail.getEndTime(),
-                                        orderDetail.getPrice()
-                                )
-                        ))
-                )
-                .collect(Collectors.groupingBy(Map.Entry::getKey,
-                        Collectors.mapping(Map.Entry::getValue, Collectors.toList())));
-
-        return groupedByDate.entrySet().stream()
-                .map(entry -> {
-                    OrderDetailRequest request = new OrderDetailRequest();
-                    request.setBookingDate(entry.getKey());
-                    request.setBookingSlots(entry.getValue());
-                    return request;
-                })
-                .collect(Collectors.toList());
-    }
-
-    @Mapping(source = "id", target = "id")
-    @Mapping(target = "userId", source = "user.id")
-    @Mapping(target = "createdAt", source = "createdAt")
-    @Mapping(target = "orderDetails", expression = "java(shouldMapOrderDetails(order) ? mapOrderDetailsToResponse(order.getOrderDetails()) : null)")
-    @Mapping(target = "serviceDetails", expression = "java(shouldMapServiceDetails(order) ? mapServiceDetailsToResponse(order.getServiceDetails()) : null)")
-    OrderResponse toOrderResponse(Order order);
-
-    default boolean shouldMapOrderDetails(Order order) {
-        return order.getOrderType() != null && !order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
-    }
-
-    default boolean shouldMapServiceDetails(Order order) {
-        return order.getOrderType() != null && order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
-    }
-
-    default List<OrderDetailResponse> mapOrderDetailsToResponse(List<OrderDetail> orderDetails) {
-        if (orderDetails == null || orderDetails.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return orderDetails.stream()
-                .map(orderDetail -> new OrderDetailResponse(
-                        orderDetail.getCourtSlotName(),
-                        orderDetail.getStartTime(),
-                        orderDetail.getEndTime(),
-                        orderDetail.getBookingDates().stream()
-                                .map(BookingDate::getBookingDate)
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
-    }
-
-    default List<ServiceDetailResponse> mapServiceDetailsToResponse(List<ServiceDetailEntity> serviceDetails) {
-        if (serviceDetails == null || serviceDetails.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return serviceDetails.stream()
-                .map(serviceDetail -> ServiceDetailResponse.builder()
-                        .courtServiceId(serviceDetail.getCourtServiceId())
-                        .courtServiceName(serviceDetail.getCourtServiceName())
-                        .quantity(serviceDetail.getQuantity())
-                        .price(serviceDetail.getPrice())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    List<OrderResponse> toOrderResponses(List<Order> orders);
-
+//    @Mapping(source = "id", target = "id")
+//    @Mapping(target = "userId", source = "user.id")
+//    @Mapping(target = "createdAt", source = "createdAt")
+//    @Mapping(target = "orderDetails", expression = "java(shouldMapOrderDetails(order) ? mapOrderDetailsToResponse(order.getOrderDetails()) : null)")
+//    @Mapping(target = "serviceDetails", expression = "java(shouldMapServiceDetails(order) ? mapServiceDetailsToResponse(order.getServiceDetails()) : null)")
+//    OrderResponse toOrderResponse(Order order);
+//
+//    default boolean shouldMapOrderDetails(Order order) {
+//        return order.getOrderType() != null && !order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
+//    }
+//
+//    default boolean shouldMapServiceDetails(Order order) {
+//        return order.getOrderType() != null && order.getOrderType().equalsIgnoreCase("Đơn dịch vụ");
+//    }
+//
+//    default List<OrderDetailResponse> mapOrderDetailsToResponse(List<OrderDetail> orderDetails) {
+//        if (orderDetails == null || orderDetails.isEmpty()) {
+//            return Collections.emptyList();
+//        }
+//
+//        return orderDetails.stream()
+//                .map(orderDetail -> new OrderDetailResponse(
+//                        orderDetail.getCourtSlotName(),
+//                        orderDetail.getStartTime(),
+//                        orderDetail.getEndTime(),
+//                        orderDetail.getBookingDates().stream()
+//                                .map(BookingDate::getBookingDate)
+//                                .collect(Collectors.toList())
+//                ))
+//                .collect(Collectors.toList());
+//    }
+//
+//    default List<ServiceDetailResponse> mapServiceDetailsToResponse(List<ServiceDetailEntity> serviceDetails) {
+//        if (serviceDetails == null || serviceDetails.isEmpty()) {
+//            return Collections.emptyList();
+//        }
+//
+//        return serviceDetails.stream()
+//                .map(serviceDetail -> ServiceDetailResponse.builder()
+//                        .courtServiceId(serviceDetail.getCourtServiceId())
+//                        .courtServiceName(serviceDetail.getCourtServiceName())
+//                        .quantity(serviceDetail.getQuantity())
+//                        .price(serviceDetail.getPrice())
+//                        .build())
+//                .collect(Collectors.toList());
+//    }
+//
+//    List<OrderResponse> toOrderResponses(List<Order> orders);
+//
+//    @Mapping(source = "id", target = "id")
+//    @Mapping(target = "userId", source = "user.id")
+//    @Mapping(target = "createdAt", source = "createdAt")
+//    OrderData toOrderData(Order order);
+//
+//    List<OrderData> toDatas(List<Order> orders);
 
     @Mapping(target = "courtId", source = "courtId")
     @Mapping(target = "dateBooking", source = "orderDetail.bookingDate")
@@ -169,7 +175,7 @@ public interface OrderMapper {
 
         return bookingSlots.stream()
                 .collect(Collectors.toMap(
-                        OrderDetailDto::getCourtSlotName,
+                        OrderDetailDto::getCourtSlotId,
                         slot -> splitTimeSlots(slot.getStartTime(), slot.getEndTime()),
                         (existing, replacement) -> {
                             existing.addAll(replacement);
@@ -228,7 +234,7 @@ public interface OrderMapper {
 
                 // Thêm vào courtSlotBookings
                 updateBookingSlot.getCourtSlotBookings()
-                        .computeIfAbsent(orderDetail.getCourtSlotName(), k -> new ArrayList<>())
+                        .computeIfAbsent(orderDetail.getCourtSlotId(), k -> new ArrayList<>())
                         .addAll(timeSlots);
             }
         }
@@ -259,7 +265,7 @@ public interface OrderMapper {
 
                 // Nhóm theo courtSlotName
                 courtSlotBookings
-                        .computeIfAbsent(orderDetail.getCourtSlotName(), k -> new ArrayList<>())
+                        .computeIfAbsent(orderDetail.getCourtSlotId(), k -> new ArrayList<>())
                         .addAll(timeSlots);
             }
         }
@@ -325,12 +331,7 @@ public interface OrderMapper {
 //
 //    OrderDetailResponse toResponse(OrderDetail orderDetail);
 //
-    @Mapping(source = "id", target = "id")
-    @Mapping(target = "userId", source = "user.id")
-    @Mapping(target = "createdAt", source = "createdAt")
-    OrderData toOrderData(Order order);
 
-    List<OrderData> toDatas(List<Order> orders);
 //
 //    List<OrderResponse> toResponseList(List<Order> orders);
 //

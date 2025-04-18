@@ -4,16 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import vn.pickleball.identityservice.client.CourtClient;
 import vn.pickleball.identityservice.dto.AnalysisTarget;
 import vn.pickleball.identityservice.dto.AnalysisType;
@@ -26,7 +21,6 @@ import vn.pickleball.identityservice.mapper.TransactionMapper;
 import vn.pickleball.identityservice.repository.OrderRepository;
 import vn.pickleball.identityservice.repository.OrderSpecification;
 import vn.pickleball.identityservice.repository.TransactionRepository;
-import vn.pickleball.identityservice.repository.UserRepository;
 import vn.pickleball.identityservice.utils.SecurityContextUtil;
 
 import java.io.ByteArrayOutputStream;
@@ -34,7 +28,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,12 +38,12 @@ import java.util.stream.Stream;
 @Transactional
 @Slf4j
 public class DashboardService {
-    private final TransactionRepository transactionRepository;
+    private final TransactionService transactionService;
     private final TransactionMapper transactionMapper;
-    private final OrderRepository orderRepository;
-    private final OrderMapper orderMapper;
-    private final UserRepository userRepository;
+    private final OrderService orderService;
+    private final UserService userService;
     private final CourtClient courtClient;
+    private final OrderMapCustom orderMapCustom;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
@@ -59,13 +52,28 @@ public class DashboardService {
                                                           LocalDateTime startDate, LocalDateTime endDate,
                                                           int page, int size) {
 
-        courtId = getCourtIdManage(courtId);
+        List<String> courtIds;
 
-        PageRequest pageable = PageRequest.of(page - 1, size);
-        var transactionsPage = transactionRepository.findTransactions(paymentStatus, courtId, orderId,startDate, endDate, pageable);
+        // Determine court IDs based on role and request
+        if (courtId != null) {
+            // Case 3: Specific court ID provided
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
+            } else {
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
 
-        BigDecimal totalAmount = transactionRepository.getTotalAmountExcludingRefund(courtId, orderId,startDate, endDate);
-        BigDecimal refundAmount = transactionRepository.getTotalRefundAmount(courtId, orderId, startDate, endDate);
+        var transactionsPage = transactionService.getTransactions(paymentStatus, courtIds, orderId,startDate, endDate, page, size);
+
+        BigDecimal totalAmount = transactionService.getTotalAmountExcludingRefund(courtIds, orderId,startDate, endDate);
+        BigDecimal refundAmount = transactionService.getTotalRefundAmount(courtIds, orderId, startDate, endDate);
         BigDecimal netAmount = totalAmount.subtract(refundAmount);
 
         List<TransactionDto> transactionDtos = transactionMapper.toDtoList(transactionsPage.getContent());
@@ -84,11 +92,26 @@ public class DashboardService {
     public OrderPage searchOrders(String courtId,String orderType, String orderStatus, String paymentStatus,
                                     LocalDate startDate, LocalDate endDate, int page, int size) {
 
-        courtId = getCourtIdManage(courtId);
-        PageRequest pageable = PageRequest.of(page - 1, size);
-        var ordersPage = orderRepository.findOrders(courtId, orderType, orderStatus, paymentStatus, startDate, endDate, pageable);
+        List<String> courtIds;
 
-        List<OrderData> orderData = orderMapper.toDatas(ordersPage.getContent());
+        // Determine court IDs based on role and request
+        if (courtId != null) {
+            // Case 3: Specific court ID provided
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
+            } else {
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
+        var ordersPage = orderService.getOrders(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate, page, size);
+
+        List<OrderData> orderData = orderMapCustom.toOrderDataList(ordersPage.getContent());
 
         return OrderPage.builder()
                 .orders(orderData)
@@ -97,52 +120,41 @@ public class DashboardService {
                 .build();
     }
 
+
+
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public List<TransactionDto> getTransactionByOrderId(String orderId){
-        List<Transaction> transactions = transactionRepository.findByOrderId(orderId);
+        List<Transaction> transactions = transactionService.findByOrderId(orderId);
 
         return transactionMapper.toDtoList(transactions);
     }
 
-    private String getCourtIdManage (String courtId){
-        boolean isManager = SecurityContextUtil.isManager();
-        if(!isManager) return courtId;
-        User manager = userRepository.findById(SecurityContextUtil.getUid()).orElseThrow(() -> new ApiException("manager unauthorize","MANAGER_UNAUTHORIZE"));
-
-        return manager.getCourtId();
-    }
-
-    private List<String> getCourtIdsManage(List<String> courtIds) {
-        boolean isManager = SecurityContextUtil.isManager();
-        if (!isManager) return courtIds;
-
-        User manager = userRepository.findById(SecurityContextUtil.getUid())
-                .orElseThrow(() -> new ApiException("manager unauthorize", "MANAGER_UNAUTHORIZE"));
-
-
-        return List.of(manager.getCourtId());
-    }
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public RevenueSummaryResponse generateRevenueReport(RevenueSummaryRequest request) {
         List<String> inputCourtIds = request.getFilters().getCourtIds();
 
-        List<String> allowedCourtIds = getCourtIdsManage(inputCourtIds);
+        List<String> courtIds;
 
-        request.getFilters().setCourtIds(allowedCourtIds);
-        // 1. Build dynamic query using Specification
-        Specification<Order> spec = Specification.where(
-                        OrderSpecification.hasBookingDateBetween(
-                                request.getDateRange().getStartDate(),
-                                request.getDateRange().getEndDate()
-                        )
-                ).and(OrderSpecification.hasOrderStatusIn(request.getFilters().getOrderStatus() != null ? request.getFilters().getOrderStatus() : Arrays.asList("Đặt lịch thành công", "Thay đổi lịch đặt thành công", "Đã hoàn thành" , "Đã sử dụng lịch đặt" , "Không sử dụng lịch đặt" , "Đặt dịch vụ tại sân thành công")))
-                .and(OrderSpecification.hasPaymentStatusIn(request.getFilters().getPaymentStatus()))
-                .and(OrderSpecification.hasCourtIdIn(request.getFilters().getCourtIds()))
-                .and(OrderSpecification.hasOrderTypeIn(request.getFilters().getOrderTypes()));
+        // Determine court IDs based on role and request
+        if (inputCourtIds != null) {
+            // Case 3: Specific court ID provided
+            courtIds = getCourtIdsManage(inputCourtIds);
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
+            } else {
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
 
-        // 2. Fetch orders with necessary data
-        List<Order> orders = orderRepository.findAll(spec);
+        request.getFilters().setCourtIds(courtIds);
+
+        List<Order> orders = orderService.searchOrdersRevenue(request);
 
         // 3. Calculate summary metrics
         BigDecimal totalPaid = calculateTotalPaid(orders);
@@ -174,7 +186,7 @@ public class DashboardService {
 
     private BigDecimal calculateTotalRefund(List<Order> orders) {
         List<String> orderIds = orders.stream().map(Order::getId).collect(Collectors.toList());
-        return transactionRepository.sumRefundAmountByOrderIds(orderIds);
+        return transactionService.calculateTotalRefund(orderIds);
     }
 
     private BigDecimal calculateTotalDeposit(List<Order> orders) {
@@ -205,9 +217,8 @@ public class DashboardService {
 
                             // Xác định courtId nếu được yêu cầu
                             String courtId = groupBy.contains("courtId") ? order.getCourtId() : "ALL";
-                            String courtName = groupBy.contains("courtId") ? order.getCourtName() : "ALL_COURT";
 
-                            return !period.isEmpty() ? period + "|" + courtId + "|" + courtName: courtId + "|" + courtName;
+                            return !period.isEmpty() ? period + "|" + courtId + "|" : courtId + "|";
                         },
                         TreeMap::new, // Sắp xếp key tự động (theo thứ tự tăng dần)
                         Collectors.toList()
@@ -215,18 +226,26 @@ public class DashboardService {
     }
 
     private List<RevenueData> buildRevenueDataList(Map<String, List<Order>> groupedOrders) {
+
+        Map<String, CourtMap> courtMap = courtClient.getAllCourts().getBody().stream()
+                .collect(Collectors.toMap(CourtMap::getId, court -> court));
+
         return groupedOrders.entrySet().stream()
                 .map(entry -> {
                     String[] keys = entry.getKey().split("\\|");
-                    String period = keys.length > 2 ? keys[0] : null;
-                    String courtId = keys.length > 2 ? keys[1] : keys[0];
-                    String courtName = keys.length > 2 ? keys[2] : keys[1];
+                    String period = keys.length > 1 ? keys[0] : null;
+                    String courtId = keys.length > 1 ? keys[1] : keys[0];
 
                     List<Order> groupOrders = entry.getValue();
                     BigDecimal totalPaid = calculateTotalPaid(groupOrders);
                     BigDecimal totalRefund = calculateTotalRefund(groupOrders);
                     BigDecimal totalDeposit = calculateTotalDeposit(groupOrders);
                     BigDecimal totalRevenue = totalPaid.subtract(totalRefund);
+
+                    // Lấy courtName từ courtMap
+                    CourtMap court = courtMap.get(courtId);
+                    String courtName = court != null ? court.getName() : null;
+
                     return RevenueData.builder()
                             .period(period)
                             .courtId(courtId)
@@ -240,43 +259,58 @@ public class DashboardService {
                 .collect(Collectors.toList());
     }
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public OccupancyAnalysisResponse analyzeOccupancy(OccupancyAnalysisRequest request) {
-        String courtId = getCourtIdManage(request.getCourtId());
-        List<Order> bookings;
-        int totalSlots;
+        String courtId = request.getCourtId();
+        List<String> courtIds;
 
+        // Determine court IDs based on role and request
         if (courtId != null) {
-            // Single court case
-            CourtPriceResponse courtPrice = fetchCourtTimeSlots(courtId);
-            totalSlots = calculateTotalSlots(courtPrice, request.getDateRange(), courtId);
-            bookings = fetchBookings(courtId, request.getDateRange());
-            if (request.getAnalysisType() == AnalysisType.BY_DAY_OF_WEEK) {
-                return buildDayOfWeekResponse(bookings, courtPrice, totalSlots, courtId, request.getDateRange());
+            // Case 3: Specific court ID provided
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
             } else {
-                return buildHourlyResponse(bookings, courtPrice, totalSlots, courtId, request.getDateRange());
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
+
+        // Handle empty court IDs
+        if (courtIds == null || courtIds.isEmpty()) {
+            OccupancyAnalysisResponse response = new OccupancyAnalysisResponse();
+            response.setAnalysisDetails(new ArrayList<>());
+            response.setTotalSlots(0);
+            response.setBookedSlots(0);
+            response.setOccupancyRate(0.0);
+            return response;
+        }
+
+        // Fetch bookings and calculate total slots
+        List<Order> bookings = orderService.fetchBookings(courtIds, request.getDateRange());
+        int totalSlots = calculateTotalSlots(courtIds, request.getDateRange());
+
+        if (courtIds.size() == 1) {
+            // Single court case
+            String singleCourtId = courtIds.get(0);
+            CourtPriceResponse courtPrice = fetchCourtTimeSlots(singleCourtId);
+            if (request.getAnalysisType() == AnalysisType.BY_DAY_OF_WEEK) {
+                return buildDayOfWeekResponse(bookings, courtPrice, totalSlots, singleCourtId, request.getDateRange());
+            } else {
+                return buildHourlyResponse(bookings, courtPrice, totalSlots, singleCourtId, request.getDateRange());
             }
         } else {
             // Multiple courts case
-            List<String> courtIds = courtClient.getCourtIds().getBody();
-            if (courtIds == null || courtIds.isEmpty()) {
-                OccupancyAnalysisResponse response = new OccupancyAnalysisResponse();
-                response.setAnalysisDetails(new ArrayList<>());
-                response.setTotalSlots(0);
-                response.setBookedSlots(0);
-                response.setOccupancyRate(0.0);
-                return response;
-            }
-
-            bookings = new ArrayList<>();
-            totalSlots = 0;
             Map<DayOfWeek, AnalysisDetail> dayOfWeekAnalysisMap = new HashMap<>();
             Map<String, AnalysisDetail> hourlyAnalysisMap = new HashMap<>();
 
             for (String cid : courtIds) {
                 CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
-                totalSlots += calculateTotalSlots(courtPrice, request.getDateRange(), cid);
-                List<Order> courtBookings = fetchBookings(cid, request.getDateRange());
-                bookings.addAll(courtBookings);
+                List<Order> courtBookings = orderService.fetchBookings(Collections.singletonList(cid), request.getDateRange());
 
                 if (request.getAnalysisType() == AnalysisType.BY_DAY_OF_WEEK) {
                     Map<DayOfWeek, AnalysisDetail> tempMap = initializeDayOfWeekAnalysis(courtPrice, cid, request.getDateRange());
@@ -481,7 +515,6 @@ public class DashboardService {
     }
 
     private String formatTimeRange(LocalTime start, LocalTime end) {
-        // Ensure consistent time format (HH:mm:ss)
         return String.format("%s-%s", start.toString(), end.toString());
     }
 
@@ -552,31 +585,9 @@ public class DashboardService {
         });
     }
 
-    private List<Order> fetchBookings(String courtId, DateRange dateRange) {
-        Specification<Order> spec = Specification.where(
-                OrderSpecification.hasBookingDateBetween(
-                        dateRange.getStartDate(),
-                        dateRange.getEndDate()
-                )
-        ).and(OrderSpecification.hasOrderStatusIn(Arrays.asList(
-                "Đặt lịch thành công",
-                "Thay đổi lịch đặt thành công",
-                "Đã hoàn thành",
-                "Đã sử dụng lịch đặt",
-                "Không sử dụng lịch đặt"
-        )));
-
-        if (courtId != null) {
-            spec = spec.and((root, query, cb) ->
-                    cb.equal(root.get("courtId"), courtId));
-        }
-
-        return orderRepository.findAll(spec);
-    }
-
-    private int calculateTotalSlots(CourtPriceResponse courtPrice, DateRange request, String courtId) {
-        LocalDate startDate = request.getStartDate();
-        LocalDate endDate = request.getEndDate();
+    private int calculateTotalSlots(List<String> courtIds, DateRange dateRange) {
+        LocalDate startDate = dateRange.getStartDate();
+        LocalDate endDate = dateRange.getEndDate();
 
         long weekdayDays = 0;
         long weekendDays = 0;
@@ -591,29 +602,16 @@ public class DashboardService {
             current = current.plusDays(1);
         }
 
-        if (courtId != null) {
+        int totalSlots = 0;
+        for (String cid : courtIds) {
+            CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
             int weekdaySlotsPerDay = calculateSlotsPerDay(courtPrice, false);
             int weekendSlotsPerDay = calculateSlotsPerDay(courtPrice, true);
-            int courtSlotsCount = getNumberCourtSlot(courtId);
-            return (int) ((weekdaySlotsPerDay * weekdayDays * courtSlotsCount) +
-                    (weekendSlotsPerDay * weekendDays * courtSlotsCount));
-        } else {
-            List<String> courtIds = courtClient.getCourtIds().getBody();
-            if (courtIds == null || courtIds.isEmpty()) {
-                return 0;
-            }
-
-            int totalSlots = 0;
-            for (String cid : courtIds) {
-                CourtPriceResponse price = fetchCourtTimeSlots(cid);
-                int weekdaySlotsPerDay = calculateSlotsPerDay(price, false);
-                int weekendSlotsPerDay = calculateSlotsPerDay(price, true);
-                int courtSlotsCount = getNumberCourtSlot(cid);
-                totalSlots += (weekdaySlotsPerDay * weekdayDays * courtSlotsCount) +
-                        (weekendSlotsPerDay * weekendDays * courtSlotsCount);
-            }
-            return totalSlots;
+            int courtSlotsCount = getNumberCourtSlot(cid);
+            totalSlots += (weekdaySlotsPerDay * weekdayDays * courtSlotsCount) +
+                    (weekendSlotsPerDay * weekendDays * courtSlotsCount);
         }
+        return totalSlots;
     }
 
     private int calculateSlotsPerDay(CourtPriceResponse courtPrice, boolean isWeekend) {
@@ -683,44 +681,74 @@ public class DashboardService {
         return courtClient.getCourtPriceByCourtId(courtId);
     }
 
+    private String getCourtIdManage(String courtId) {
+        boolean isManager = SecurityContextUtil.isManager();
+        if (!isManager) return courtId;
 
+        List<String> managedCourtIds = userService.getCourtsByUserId(SecurityContextUtil.getUid());
+        if (managedCourtIds == null || !managedCourtIds.contains(courtId)) {
+            throw new IllegalArgumentException("User does not have permission to manage court: " + courtId);
+        }
+        return courtId;
+    }
+
+    private List<String> getCourtIdsManage(List<String> courtIds) {
+        boolean isManager = SecurityContextUtil.isManager();
+        if (!isManager) return courtIds;
+
+        List<String> managedCourtIds = userService.getCourtsByUserId(SecurityContextUtil.getUid());
+        if (managedCourtIds == null || managedCourtIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return managedCourtIds;
+    }
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public PeakHoursAnalysisResponse analyzePeakHours(PeakHoursAnalysisRequest request) {
-        String courtId = getCourtIdManage(request.getCourtId());
-        List<Order> bookings = fetchBookings(courtId, request.getDateRange());
-
-        if (request.getAnalysisTarget() == AnalysisTarget.TOP_DAYS) {
-            return analyzeTopDays(bookings, request);
-        } else if (request.getAnalysisTarget() == AnalysisTarget.TOP_DAYS_OF_WEEK) {
-            return analyzeTopDaysOfWeek(bookings, request);
+        String courtId = request.getCourtId();
+        List<String> courtIds;
+        if (courtId != null) {
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
         } else {
-            return analyzeTopHours(bookings, request);
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                courtIds = getCourtIdsManage(null);
+            } else {
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
+
+        // Handle empty court IDs
+        if (courtIds == null || courtIds.isEmpty()) {
+            PeakHoursAnalysisResponse response = new PeakHoursAnalysisResponse();
+            response.setPeakResults(new ArrayList<>());
+            return response;
+        }
+
+        // Fetch bookings for the determined court IDs
+        List<Order> bookings = orderService.fetchBookings(courtIds, request.getDateRange());
+
+        // Process based on analysis target
+        if (request.getAnalysisTarget() == AnalysisTarget.TOP_DAYS) {
+            return analyzeTopDays(bookings, request, courtIds);
+        } else if (request.getAnalysisTarget() == AnalysisTarget.TOP_DAYS_OF_WEEK) {
+            return analyzeTopDaysOfWeek(bookings, request, courtIds);
+        } else {
+            return analyzeTopHours(bookings, request, courtIds);
         }
     }
 
-    private PeakHoursAnalysisResponse analyzeTopDays(List<Order> bookings, PeakHoursAnalysisRequest request) {
-        String courtId = request.getCourtId();
-        Map<LocalDate, Long> dailyCounts;
+    private PeakHoursAnalysisResponse analyzeTopDays(List<Order> bookings, PeakHoursAnalysisRequest request, List<String> courtIds) {
+        // Count bookings per day
+        Map<LocalDate, Long> dailyCounts = bookings.stream()
+                .flatMap(order -> order.getOrderDetails().stream())
+                .flatMap(detail -> detail.getBookingDates().stream())
+                .collect(Collectors.groupingBy(
+                        BookingDate::getBookingDate,
+                        Collectors.counting()
+                ));
 
-        if (courtId != null) {
-            // Single court
-            dailyCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> detail.getBookingDates().stream())
-                    .collect(Collectors.groupingBy(
-                            BookingDate::getBookingDate,
-                            Collectors.counting()
-                    ));
-        } else {
-            // Multiple courts
-            dailyCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> detail.getBookingDates().stream())
-                    .collect(Collectors.groupingBy(
-                            BookingDate::getBookingDate,
-                            Collectors.counting()
-                    ));
-        }
-
+        // Get top days
         List<PeakResult> topDays = dailyCounts.entrySet().stream()
                 .sorted(Map.Entry.<LocalDate, Long>comparingByValue().reversed()
                         .thenComparing(Map.Entry::getKey))
@@ -735,37 +763,18 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         // Calculate occupancy rate
-        if (courtId != null) {
-            // Single court
-            CourtPriceResponse courtPrice = fetchCourtTimeSlots(courtId);
-            topDays.forEach(result -> {
-                int totalSlots = calculateSlotsForDay(
+        topDays.forEach(result -> {
+            int totalSlots = 0;
+            for (String cid : courtIds) {
+                CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
+                totalSlots += calculateSlotsForDay(
                         DayOfWeek.valueOf(result.getDayOfWeek()),
                         courtPrice,
-                        courtId
+                        cid
                 );
-                result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
-            });
-        } else {
-            // Multiple courts
-            List<String> courtIds = courtClient.getCourtIds().getBody();
-            if (courtIds == null || courtIds.isEmpty()) {
-                topDays.forEach(result -> result.setOccupancyRate(0.0));
-            } else {
-                topDays.forEach(result -> {
-                    int totalSlots = 0;
-                    for (String cid : courtIds) {
-                        CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
-                        totalSlots += calculateSlotsForDay(
-                                DayOfWeek.valueOf(result.getDayOfWeek()),
-                                courtPrice,
-                                cid
-                        );
-                    }
-                    result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
-                });
             }
-        }
+            result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
+        });
 
         // Sort by date (ascending)
         topDays.sort(Comparator.comparing(PeakResult::getDate));
@@ -775,57 +784,30 @@ public class DashboardService {
         return response;
     }
 
-    private PeakHoursAnalysisResponse analyzeTopDaysOfWeek(List<Order> bookings, PeakHoursAnalysisRequest request) {
-        String courtId = request.getCourtId();
-        Map<DayOfWeek, Long> dayOfWeekCounts;
-
-        if (courtId != null) {
-            // Single court
-            dayOfWeekCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> {
-                        String orderType = detail.getOrder().getOrderType();
-                        if ("Đơn cố định".equals(orderType)) {
-                            // Count slots for fixed orders
-                            int slots = calculateSlotsInRange(detail.getStartTime(), detail.getEndTime());
-                            return detail.getBookingDates().stream()
-                                    .flatMap(bookingDate ->
-                                            Stream.generate(() -> bookingDate)
-                                                    .limit(slots)
-                                    );
-                        } else {
-                            // Count 1 slot for daily orders
-                            return detail.getBookingDates().stream();
-                        }
-                    })
-                    .map(bookingDate -> bookingDate.getBookingDate().getDayOfWeek())
-                    .collect(Collectors.groupingBy(
-                            Function.identity(),
-                            Collectors.counting()
-                    ));
-        } else {
-            // Multiple courts
-            dayOfWeekCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> {
-                        String orderType = detail.getOrder().getOrderType();
-                        if ("Đơn cố định".equals(orderType)) {
-                            int slots = calculateSlotsInRange(detail.getStartTime(), detail.getEndTime());
-                            return detail.getBookingDates().stream()
-                                    .flatMap(bookingDate ->
-                                            Stream.generate(() -> bookingDate)
-                                                    .limit(slots)
-                                    );
-                        } else {
-                            return detail.getBookingDates().stream();
-                        }
-                    })
-                    .map(bookingDate -> bookingDate.getBookingDate().getDayOfWeek())
-                    .collect(Collectors.groupingBy(
-                            Function.identity(),
-                            Collectors.counting()
-                    ));
-        }
+    private PeakHoursAnalysisResponse analyzeTopDaysOfWeek(List<Order> bookings, PeakHoursAnalysisRequest request, List<String> courtIds) {
+        // Count bookings per DayOfWeek
+        Map<DayOfWeek, Long> dayOfWeekCounts = bookings.stream()
+                .flatMap(order -> order.getOrderDetails().stream())
+                .flatMap(detail -> {
+                    String orderType = detail.getOrder().getOrderType();
+                    if ("Đơn cố định".equals(orderType)) {
+                        // Count slots for fixed orders
+                        int slots = calculateSlotsInRange(detail.getStartTime(), detail.getEndTime());
+                        return detail.getBookingDates().stream()
+                                .flatMap(bookingDate ->
+                                        Stream.generate(() -> bookingDate)
+                                                .limit(slots)
+                                );
+                    } else {
+                        // Count 1 slot for daily orders
+                        return detail.getBookingDates().stream();
+                    }
+                })
+                .map(bookingDate -> bookingDate.getBookingDate().getDayOfWeek())
+                .collect(Collectors.groupingBy(
+                        Function.identity(),
+                        Collectors.counting()
+                ));
 
         // Calculate days per DayOfWeek in range
         LocalDate startDate = request.getDateRange().getStartDate();
@@ -838,6 +820,7 @@ public class DashboardService {
             current = current.plusDays(1);
         }
 
+        // Get top days of week
         List<PeakResult> topDaysOfWeek = dayOfWeekCounts.entrySet().stream()
                 .sorted(Map.Entry.<DayOfWeek, Long>comparingByValue().reversed())
                 .limit(request.getTopCount())
@@ -851,35 +834,17 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         // Calculate occupancy rate
-        if (courtId != null) {
-            // Single court
-            CourtPriceResponse courtPrice = fetchCourtTimeSlots(courtId);
-            topDaysOfWeek.forEach(result -> {
-                DayOfWeek day = DayOfWeek.valueOf(result.getDayOfWeek());
-                int slotsPerDay = calculateSlotsForDay(day, courtPrice, courtId);
-                long days = dayOccurrences.getOrDefault(day, 0L);
-                int totalSlots = slotsPerDay * (int) days;
-                result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
-            });
-        } else {
-            // Multiple courts
-            List<String> courtIds = courtClient.getCourtIds().getBody();
-            if (courtIds == null || courtIds.isEmpty()) {
-                topDaysOfWeek.forEach(result -> result.setOccupancyRate(0.0));
-            } else {
-                topDaysOfWeek.forEach(result -> {
-                    int totalSlots = 0;
-                    DayOfWeek day = DayOfWeek.valueOf(result.getDayOfWeek());
-                    long days = dayOccurrences.getOrDefault(day, 0L);
-                    for (String cid : courtIds) {
-                        CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
-                        int slotsPerDay = calculateSlotsForDay(day, courtPrice, cid);
-                        totalSlots += slotsPerDay * (int) days;
-                    }
-                    result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
-                });
+        topDaysOfWeek.forEach(result -> {
+            int totalSlots = 0;
+            DayOfWeek day = DayOfWeek.valueOf(result.getDayOfWeek());
+            long days = dayOccurrences.getOrDefault(day, 0L);
+            for (String cid : courtIds) {
+                CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
+                int slotsPerDay = calculateSlotsForDay(day, courtPrice, cid);
+                totalSlots += slotsPerDay * (int) days;
             }
-        }
+            result.setOccupancyRate(calculateOccupancyRate(result.getBookingCount(), totalSlots));
+        });
 
         // Sort by DayOfWeek (Monday to Sunday)
         topDaysOfWeek.sort(Comparator.comparing(result -> DayOfWeek.valueOf(result.getDayOfWeek())));
@@ -889,62 +854,33 @@ public class DashboardService {
         return response;
     }
 
-    private PeakHoursAnalysisResponse analyzeTopHours(List<Order> bookings, PeakHoursAnalysisRequest request) {
-        String courtId = request.getCourtId();
-        Map<String, Long> hourlyCounts;
+    private PeakHoursAnalysisResponse analyzeTopHours(List<Order> bookings, PeakHoursAnalysisRequest request, List<String> courtIds) {
+        // Count bookings per time range
+        Map<String, Long> hourlyCounts = bookings.stream()
+                .flatMap(order -> order.getOrderDetails().stream())
+                .flatMap(detail -> detail.getBookingDates().stream()
+                        .flatMap(bookingDate -> {
+                            LocalTime start = detail.getStartTime();
+                            LocalTime end = detail.getEndTime();
+                            List<String> timeRanges = new ArrayList<>();
+                            LocalTime current = start;
 
-        if (courtId != null) {
-            // Single court
-            hourlyCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> detail.getBookingDates().stream()
-                            .flatMap(bookingDate -> {
-                                LocalTime start = detail.getStartTime();
-                                LocalTime end = detail.getEndTime();
-                                List<String> timeRanges = new ArrayList<>();
-                                LocalTime current = start;
-
-                                while (current.isBefore(end)) {
-                                    LocalTime slotEnd = current.plusMinutes(30);
-                                    if (slotEnd.isAfter(end)) {
-                                        slotEnd = end;
-                                    }
-                                    timeRanges.add(formatTimeRange(current, slotEnd));
-                                    current = slotEnd;
+                            while (current.isBefore(end)) {
+                                LocalTime slotEnd = current.plusMinutes(30);
+                                if (slotEnd.isAfter(end)) {
+                                    slotEnd = end;
                                 }
-                                return timeRanges.stream();
-                            }))
-                    .collect(Collectors.groupingBy(
-                            Function.identity(),
-                            Collectors.counting()
-                    ));
-        } else {
-            // Multiple courts
-            hourlyCounts = bookings.stream()
-                    .flatMap(order -> order.getOrderDetails().stream())
-                    .flatMap(detail -> detail.getBookingDates().stream()
-                            .flatMap(bookingDate -> {
-                                LocalTime start = detail.getStartTime();
-                                LocalTime end = detail.getEndTime();
-                                List<String> timeRanges = new ArrayList<>();
-                                LocalTime current = start;
+                                timeRanges.add(formatTimeRange(current, slotEnd));
+                                current = slotEnd;
+                            }
+                            return timeRanges.stream();
+                        }))
+                .collect(Collectors.groupingBy(
+                        Function.identity(),
+                        Collectors.counting()
+                ));
 
-                                while (current.isBefore(end)) {
-                                    LocalTime slotEnd = current.plusMinutes(30);
-                                    if (slotEnd.isAfter(end)) {
-                                        slotEnd = end;
-                                    }
-                                    timeRanges.add(formatTimeRange(current, slotEnd));
-                                    current = slotEnd;
-                                }
-                                return timeRanges.stream();
-                            }))
-                    .collect(Collectors.groupingBy(
-                            Function.identity(),
-                            Collectors.counting()
-                    ));
-        }
-
+        // Get top hours
         List<PeakResult> topHours = hourlyCounts.entrySet().stream()
                 .sorted(Map.Entry.<String, Long>comparingByValue().reversed()
                         .thenComparing(entry -> {
@@ -961,29 +897,14 @@ public class DashboardService {
                 .collect(Collectors.toList());
 
         // Calculate occupancy rate
-        if (courtId != null) {
-            // Single court
-            CourtPriceResponse courtPrice = fetchCourtTimeSlots(courtId);
-            topHours.forEach(hour -> {
-                int totalSlots = calculateTotalSlotsForTimeRange(hour.getTimeRange(), courtPrice, request, courtId);
-                hour.setOccupancyRate(calculateOccupancyRate(hour.getBookingCount(), totalSlots));
-            });
-        } else {
-            // Multiple courts
-            List<String> courtIds = courtClient.getCourtIds().getBody();
-            if (courtIds == null || courtIds.isEmpty()) {
-                topHours.forEach(hour -> hour.setOccupancyRate(0.0));
-            } else {
-                topHours.forEach(hour -> {
-                    int totalSlots = 0;
-                    for (String cid : courtIds) {
-                        CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
-                        totalSlots += calculateTotalSlotsForTimeRange(hour.getTimeRange(), courtPrice, request, cid);
-                    }
-                    hour.setOccupancyRate(calculateOccupancyRate(hour.getBookingCount(), totalSlots));
-                });
+        topHours.forEach(hour -> {
+            int totalSlots = 0;
+            for (String cid : courtIds) {
+                CourtPriceResponse courtPrice = fetchCourtTimeSlots(cid);
+                totalSlots += calculateTotalSlotsForTimeRange(hour.getTimeRange(), courtPrice, request, cid);
             }
-        }
+            hour.setOccupancyRate(calculateOccupancyRate(hour.getBookingCount(), totalSlots));
+        });
 
         PeakHoursAnalysisResponse response = new PeakHoursAnalysisResponse();
         response.setPeakResults(topHours);
@@ -1049,11 +970,27 @@ public class DashboardService {
     }
 
 
-    public byte[] generateOrderReportExcel(String courtIdIn, String orderType, String orderStatus, String paymentStatus,
+    public byte[] generateOrderReportExcel(String courtId, String orderType, String orderStatus, String paymentStatus,
                                            LocalDate startDate, LocalDate endDate) {
 
-        String courtId = getCourtIdManage(courtIdIn);
-        List<Order> orders = orderRepository.findOrdersByFilters(courtId, orderType, orderStatus, paymentStatus, startDate, endDate);
+        List<String> courtIds;
+
+        // Determine court IDs based on role and request
+        if (courtId != null) {
+            // Case 3: Specific court ID provided
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
+            } else {
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
+        List<Order> orders = orderService.findOrdersByFilters(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate);
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Order Report");
@@ -1061,7 +998,7 @@ public class DashboardService {
             // Create header row
             Row headerRow = sheet.createRow(0);
             String[] headers = {
-                    "Order ID", "Court ID", "Court Name", "Address", "Customer Name", "Phone Number", "Order Type",
+                    "Order ID", "Court ID", "Customer Name", "Phone Number", "Order Type",
                     "Order Status", "Payment Status", "Total Amount", "Deposit Amount", "Discount Amount", "Amount Paid",
                     "Amount Refunded", "Payment Timeout", "Bill Code", "Order Details", "Service Details", "Transactions"
             };
@@ -1081,8 +1018,6 @@ public class DashboardService {
 
                 row.createCell(cellNum++).setCellValue(order.getId());
                 row.createCell(cellNum++).setCellValue(order.getCourtId());
-                row.createCell(cellNum++).setCellValue(order.getCourtName());
-                row.createCell(cellNum++).setCellValue(order.getAddress());
                 row.createCell(cellNum++).setCellValue(order.getCustomerName());
                 row.createCell(cellNum++).setCellValue(order.getPhoneNumber());
                 row.createCell(cellNum++).setCellValue(order.getOrderType());
@@ -1142,7 +1077,7 @@ public class DashboardService {
                 .map(bd -> bd.getBookingDate().format(DATE_FORMATTER))
                 .collect(Collectors.joining(", "));
         return String.format("Slot: %s, Start: %s, End: %s, Price: %s, Dates: [%s]",
-                od.getCourtSlotName(),
+                od.getCourtSlotId(),
                 od.getStartTime().toString(),
                 od.getEndTime().toString(),
                 od.getPrice() != null ? od.getPrice().toString() : "N/A",
@@ -1151,24 +1086,40 @@ public class DashboardService {
 
     private String formatServiceDetail(ServiceDetailEntity sd) {
         return String.format("Service: %s, Quantity: %d, Price: %s",
-                sd.getCourtServiceName(),
+                sd.getCourtServiceId(),
                 sd.getQuantity(),
                 sd.getPrice() != null ? sd.getPrice().toString() : "N/A");
     }
 
     private String formatTransaction(Transaction t) {
-        return String.format("ID: %s, Amount: %s, Status: %s, Bill Code: %s, Created: %s",
+        return String.format("ID: %s, Amount: %s, Bill Code: %s, Created: %s",
                 t.getId(),
                 t.getAmount() != null ? t.getAmount().toString() : "N/A",
-                t.getStatus(),
                 t.getBillCode() != null ? t.getBillCode() : "N/A",
                 t.getCreateDate() != null ? t.getCreateDate().format(DATE_FORMATTER) : "N/A");
     }
 
-    public byte[] generateTransactionReportExcel(String paymentStatus,String courtIdIn, String orderId,
+    public byte[] generateTransactionReportExcel(String paymentStatus,String courtId, String orderId,
                                                  LocalDateTime startDate, LocalDateTime endDate) {
-        String courtId = getCourtIdManage(courtIdIn);
-        List<Transaction> transactions = transactionRepository.findTransactionsByFilters(paymentStatus, courtId, orderId,startDate, endDate);
+        List<String> courtIds;
+
+        // Determine court IDs based on role and request
+        if (courtId != null) {
+            // Case 3: Specific court ID provided
+            courtIds = Collections.singletonList(getCourtIdManage(courtId));
+        } else {
+            // Case 1 & 2: No court ID provided
+            boolean isManager = SecurityContextUtil.isManager();
+            if (isManager) {
+                // Case 2: MANAGER role
+                courtIds = getCourtIdsManage(null);
+            } else {
+                // Case 1: ADMIN role
+                courtIds = courtClient.getCourtIds().getBody();
+            }
+        }
+        List<Transaction> transactions = transactionService
+                .findTransactionsByFilters(paymentStatus, courtIds, orderId,startDate, endDate);
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Transaction Report");
@@ -1176,7 +1127,7 @@ public class DashboardService {
             // Create header row
             Row headerRow = sheet.createRow(0);
             String[] headers = {
-                    "Transaction ID", "Order ID", "Court ID", "Payment Status", "Amount", "Bill Code", "Status",
+                    "Transaction ID", "Order ID", "Payment Status", "Amount", "Bill Code",
                     "FT Code", "Create Date"
             };
             CellStyle headerStyle = createHeaderStyle(workbook);
@@ -1195,11 +1146,9 @@ public class DashboardService {
 
                 row.createCell(cellNum++).setCellValue(transaction.getId());
                 row.createCell(cellNum++).setCellValue(transaction.getOrder() != null ? transaction.getOrder().getId() : "");
-                row.createCell(cellNum++).setCellValue(transaction.getCourtId() != null ? transaction.getCourtId() : "");
                 row.createCell(cellNum++).setCellValue(transaction.getPaymentStatus() != null ? transaction.getPaymentStatus() : "");
                 row.createCell(cellNum++).setCellValue(transaction.getAmount() != null ? transaction.getAmount().toString() : "");
                 row.createCell(cellNum++).setCellValue(transaction.getBillCode() != null ? transaction.getBillCode() : "");
-                row.createCell(cellNum++).setCellValue(transaction.getStatus() != null ? transaction.getStatus() : "");
                 row.createCell(cellNum++).setCellValue(transaction.getFtCode() != null ? transaction.getFtCode() : "");
 
                 Cell createDateCell = row.createCell(cellNum++);

@@ -11,6 +11,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import vn.pickleball.identityservice.dto.request.UserCreationRequest;
+import vn.pickleball.identityservice.service.AuthenticationService;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,7 +41,13 @@ public class BeanConfiguration {
 
         template.setKeySerializer(new StringRedisSerializer());
 
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        // Configure Jackson
+        ObjectMapper objectMapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL); // Add this line
+
+        template.setValueSerializer(new GenericJackson2JsonRedisSerializer(objectMapper));
 
         return template;
     }
@@ -63,5 +70,10 @@ public class BeanConfiguration {
         objectMapper.registerModule(new JavaTimeModule()); // Hỗ trợ LocalDate, LocalDateTime
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS); // Lưu ISO 8601 thay vì timestamp
         return objectMapper;
+    }
+
+    @Bean
+    public CustomJwtDecoder customJwtDecoder(AuthenticationService authenticationService) {
+        return new CustomJwtDecoder(authenticationService);
     }
 }

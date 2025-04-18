@@ -29,10 +29,12 @@ public class Notification {
     @Column(columnDefinition = "TEXT")
     private String notificationData;
 
+    @Column(name = "phone_number")
     private String phoneNumber;
 
     @ManyToOne
-    @JoinColumn(name = "user_id")
+    @JoinColumn(name = "phone_number", referencedColumnName = "phone_number",
+            insertable = false, updatable = false,foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT) )
     @JsonBackReference
     private User user;
 }

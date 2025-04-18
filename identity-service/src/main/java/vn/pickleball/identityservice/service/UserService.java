@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -15,8 +16,10 @@ import org.springframework.http.*;
 import org.springframework.security.access.prepost.PostAuthorize;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -29,12 +32,15 @@ import vn.pickleball.identityservice.dto.request.UserCreationRequest;
 import vn.pickleball.identityservice.dto.request.UserUpdateRequest;
 import vn.pickleball.identityservice.dto.response.PagedUserResponse;
 import vn.pickleball.identityservice.dto.response.UserResponse;
+import vn.pickleball.identityservice.entity.CourtStaff;
+import vn.pickleball.identityservice.entity.CourtStaffId;
 import vn.pickleball.identityservice.entity.Role;
 import vn.pickleball.identityservice.entity.User;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.exception.AppException;
 import vn.pickleball.identityservice.exception.ErrorCode;
 import vn.pickleball.identityservice.mapper.UserMapper;
+import vn.pickleball.identityservice.repository.CourtStaffRepository;
 import vn.pickleball.identityservice.repository.RoleRepository;
 import vn.pickleball.identityservice.repository.UserRepository;
 import vn.pickleball.identityservice.repository.UserSpecification;
@@ -44,20 +50,22 @@ import vn.pickleball.identityservice.websockethandler.NotificationWebSocketHandl
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@Transactional
 public class UserService {
     UserRepository userRepository;
-    RoleRepository roleRepository;
+    RoleService roleService;
     UserMapper userMapper;
-    PasswordEncoder passwordEncoder;
     EmailService emailService;
+    CourtClient courtClient;
+    CourtStaffService courtStaffService;
     NotificationWebSocketHandler socketHandler;
     RedisTemplate<String, UserCreationRequest> redisUserTemplate;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -66,15 +74,18 @@ public class UserService {
     public UserResponse createUser(UserCreationRequest request) {
 
 
-        User user = userMapper.toUser(request);
+        User user = userMapper.toUserEntity(request);
+
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        HashSet<Role> roles = new HashSet<>();
-        roleRepository.findById(PredefinedRole.USER_ROLE).ifPresent(roles::add);
+        HashSet<Role> roles = roleService.getRole(PredefinedRole.USER_ROLE);
 
         user.setRoles(roles);
         user.setActive(true);
 
+        // check exist ( username , email , phoneNumber unique)
+        // DataIntegrityViolationException trùng khi save => throw exception user existed
         try {
             user = userRepository.save(user);
         } catch (DataIntegrityViolationException exception) {
@@ -102,6 +113,7 @@ public class UserService {
 
         if(email==null) throw new ApiException("Account not have email", "NO_EMAIL");
         String newPass = GenerateString.generateRandomString(6);
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(newPass));
         userRepository.save(user);
         emailService.sendNewPasswordEmail(email,newPass);
@@ -114,25 +126,20 @@ public class UserService {
             throw new ApiException("Confirmation email is expired", "INVALID_CONFIRM");
         }
 
-        User user = userMapper.toUser(request);
+        User user = userMapper.toUserEntity(request);
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        HashSet<Role> roles = new HashSet<>();
-        roleRepository.findById(PredefinedRole.USER_ROLE).ifPresent(roles::add);
+        HashSet<Role> roles = roleService.getRole("STUDENT");
 
         user.setRoles(roles);
-        user.setStudent(true);
+        user.setActive(true);
 
         try {
             user = userRepository.save(user);
         } catch (DataIntegrityViolationException exception) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
-//        socketHandler.sendNotification(NotificationResponse.builder()
-//                        .key(phoneNumber)
-//                        .resCode("200")
-//                        .resDesc("Confirm student success")
-//                .build());
         return userMapper.toUserResponse(user);
 
     }
@@ -169,6 +176,7 @@ public class UserService {
         User user = userRepository.findByUsername(name)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         boolean authenticated = passwordEncoder.matches(request.getPassword(), user.getPassword());
         if (!authenticated) {
             throw new ApiException("Current pass incorrect","FAIL_PASS");
@@ -196,27 +204,55 @@ public class UserService {
 
         userMapper.updateUser(user, request);
 
-        var roles = roleRepository.findAllById(request.getRoles());
+
+
+        var roles = roleService.getAllByIds(request.getRoles());
         user.setRoles(new HashSet<>(roles));
         user.setActive(request.isActive());
+        if(request.getCourtIds() != null){
+            validateCourtId(request.getCourtIds());
+            user.getCourtStaffs().clear();
+            for (String courtId : request.getCourtIds()) {
+                CourtStaff courtStaff = CourtStaff.builder()
+                        .id(new CourtStaffId(request.getId(), courtId))
+                        .userId(request.getId())
+                        .courtId(courtId)
+                        .build();
+                user.getCourtStaffs().add(courtStaff);
+            }
+        }
 
         return userMapper.toUserResponse(userRepository.save(user));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     public UserResponse createUserByAdmin(UserCreationRequest request) {
-        User user = userMapper.toUser(request);
+        User user = userMapper.toUserEntity(request);
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
 
-        var roles = roleRepository.findAllById(request.getRoles());
+        var roles = roleService.getAllByIds(request.getRoles());
         user.setRoles(new HashSet<>(roles));
-
+        user.setActive(true);
         try {
             user = userRepository.save(user);
         } catch (DataIntegrityViolationException exception) {
             throw new AppException(ErrorCode.USER_EXISTED);
         }
 
+        if(request.getCourtIds() != null){
+            validateCourtId(request.getCourtIds());
+            user.getCourtStaffs().clear();
+            for (String courtId : request.getCourtIds()) {
+                CourtStaff courtStaff = CourtStaff.builder()
+                        .id(new CourtStaffId(user.getId(), courtId))
+                        .userId(user.getId())
+                        .courtId(courtId)
+                        .build();
+                user.getCourtStaffs().add(courtStaff);
+            }
+        }
+        user = userRepository.save(user);
         return userMapper.toUserResponse(user);
     }
 
@@ -243,12 +279,13 @@ public class UserService {
                 .build();
     }
 
-    @PreAuthorize("hasRole('MANAGER')")
-    public PagedUserResponse getUsersManager(int page, int size, String username, String phoneNumber, String email, String roleName) {
-        Pageable pageable = PageRequest.of(page - 1 , size, Sort.by(Sort.Direction.DESC, "createdAt"));
 
+    @PreAuthorize("hasRole('MANAGER')")
+    public PagedUserResponse getUsersManager(int page, int size, String username, String phoneNumber, String email, String roleName, String courtId) {
+        Pageable pageable = PageRequest.of(page - 1 , size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        List<String> courts = courtId != null  ? courtId.lines().toList() : courtStaffService.getCourtsByUserId(SecurityContextUtil.getUid());
         Page<User> userPage = userRepository.findAll(
-                UserSpecification.filterUsersExcludeManager(username, phoneNumber, email, roleName, getCourtIdManage()),
+                UserSpecification.filterUsersExcludeManager(username, phoneNumber, email, roleName, courts),
                 pageable
         );
 
@@ -271,12 +308,6 @@ public class UserService {
     @PreAuthorize("hasRole('ADMIN')")
     public List<UserResponse> getUsersByRole(String role) {
         return userRepository.findUsersWithRole(role != null ? role.toUpperCase() : null).stream().map(userMapper::toUserResponse).toList();
-    }
-
-    private String getCourtIdManage(){
-        User manager = userRepository.findById(SecurityContextUtil.getUid()).orElseThrow(() -> new ApiException("manager unauthorize","MANAGER_UNAUTHORIZE"));
-
-        return manager.getCourtId();
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -312,6 +343,23 @@ public class UserService {
         return "Upload avatar success";
     }
 
+    private void validateCourtId(List<String> courtIds) {
+        List<String> existedCourtIds = courtClient.getCourtIds().getBody();
+
+        if (existedCourtIds == null) {
+            throw new ApiException("Must have at least one court", "NULL_COURT");
+        }
+
+        // Tìm các ID không tồn tại
+        List<String> invalidIds = courtIds.stream()
+                .filter(id -> !existedCourtIds.contains(id))
+                .toList();
+
+        if (!invalidIds.isEmpty()) {
+            throw new ApiException("Invalid court IDs: " + invalidIds, "INVALID_COURTIDS");
+        }
+    }
+
     public String uploadAvatarCourt(MultipartFile file, String oldPath) throws IOException {
         String url = "http://203.145.46.242:8080/api/court/public/upload-avatar";
 
@@ -339,5 +387,36 @@ public class UserService {
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
         return response.getBody();
+    }
+
+    public User findByUsernameOrEmailOrPhoneNumber(String key){
+        return userRepository
+                .findByUsernameOrEmailOrPhoneNumber(key)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    public User findByUsername(String userName){
+        return userRepository
+                .findByUsername(userName)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    public Optional<User> findByPhoneNumber(String phoneNumber){
+        return userRepository
+                .findByPhoneNumber(phoneNumber);
+    }
+
+    public User findById(String id){
+        return userRepository
+                .findById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+    }
+
+    public List<String> getCourtsByUserId(String userId){
+        return courtStaffService.getCourtsByUserId(userId);
+    }
+
+    public List<String> getUsersByCourtId(String courtId){
+        return courtStaffService.getUsersByCourtId(courtId);
     }
 }

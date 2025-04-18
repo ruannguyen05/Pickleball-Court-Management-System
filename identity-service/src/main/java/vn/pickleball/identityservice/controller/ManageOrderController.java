@@ -19,32 +19,6 @@ import java.util.List;
 public class ManageOrderController {
     private final OrderService orderService;
 
-    @GetMapping("/order/by-booking-date")
-    public ResponseEntity<List<OrderResponse>> getOrdersByBookingDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "HH:mm") LocalTime endTime) {
-
-        List<OrderResponse> responses = orderService.getOrdersByBookingDateAndTimeRange(
-                bookingDate,
-                startTime,
-                endTime);
-
-        return ResponseEntity.ok(responses);
-    }
-
-    @GetMapping("/order/by-booking-date-phone")
-    public ResponseEntity<List<OrderResponse>> getOrdersByBookingDatePhoneAndStatus(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate bookingDate,
-            @RequestParam String phoneNumber) {
-
-        List<OrderResponse> orders = orderService.getOrdersByBookingDateAndPhoneNumberWithStatus(
-                bookingDate,
-                phoneNumber);
-
-        return ResponseEntity.ok(orders);
-    }
-
     @GetMapping("/getByStaff")
     public ResponseEntity<OrderPage> getOrdersByFilter(
             @RequestParam(required = false) LocalDate bookingDate,

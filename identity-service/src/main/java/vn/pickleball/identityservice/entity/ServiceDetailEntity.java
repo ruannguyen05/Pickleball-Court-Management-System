@@ -22,9 +22,6 @@ public class ServiceDetailEntity {
     private String courtServiceId;
 
     @Column(nullable = false)
-    private String courtServiceName; // ID của CourtSlot (ví dụ: "Pickleball 2")
-
-    @Column(nullable = false)
     private int quantity;
 
     private BigDecimal price; // Giá (ví dụ: 180.000 đ)

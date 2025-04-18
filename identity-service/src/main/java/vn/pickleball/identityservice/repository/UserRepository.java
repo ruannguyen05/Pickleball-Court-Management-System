@@ -23,24 +23,11 @@ public interface UserRepository extends JpaRepository<User, String>, JpaSpecific
     @Query("SELECT u FROM User u WHERE u.id = :value OR u.phoneNumber = :value")
     Optional<User> findByIdOrPhoneNumber(String value);
 
-    Optional<User> findByPhoneNumber(String username);
+    Optional<User> findByPhoneNumber(String phoneNumber);
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name <> :adminRole")
     List<User> findUsersWithNonAdminRole(@Param("adminRole") String adminRole);
 
     @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :role")
     List<User> findUsersWithRole(@Param("role") String role);
-
-    List<User> findByCourtId (String courtId);
-
-    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r " +
-            "WHERE (:courtId IS NULL OR u.courtId = :courtId) " +
-            "AND (" +
-            "(:role IS NULL AND r.name NOT IN ('MANAGER', 'ADMIN')) " +
-            "OR (:role IS NOT NULL AND :role IN (r.name))" +
-            ")")
-    List<User> findUsersByRoleAndCourtIdManager(
-            @Param("role") String role,
-            @Param("courtId") String courtId);
-
 }

@@ -6,10 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.courtservice.entity.CourtImage;
 import vn.pickleball.courtservice.model.request.*;
-import vn.pickleball.courtservice.model.response.CourtPriceResponse;
-import vn.pickleball.courtservice.model.response.CourtServiceResponse;
-import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
-import vn.pickleball.courtservice.model.response.CourtSlotResponse;
+import vn.pickleball.courtservice.model.response.*;
 import vn.pickleball.courtservice.service.*;
 
 import java.io.IOException;
@@ -17,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/public")
@@ -47,6 +45,16 @@ public class PublicController {
     public ResponseEntity<List<CourtSlotResponse>> getCourtSlotsByCourtId(@PathVariable String courtId) {
         List<CourtSlotResponse> courtSlotResponses = courtSlotService.getCourtSlotsByCourtId(courtId);
         return ResponseEntity.ok(courtSlotResponses);
+    }
+
+    @GetMapping("/getCourtSlot/map")
+    public ResponseEntity<List<CourtSlotMap>> getCourtSlotMap(@RequestParam String courtId) {
+        List<CourtSlotMap> simpleList = courtSlotService.getCourtSlotsByCourtId(courtId)
+                .stream()
+                .map(slot -> CourtSlotMap.builder().courtSlotId(slot.getId()).courtSlotName(slot.getName()).build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(simpleList);
     }
 
     @GetMapping("/court_slot/getIdsByCourtId/{courtId}")
@@ -91,6 +99,17 @@ public class PublicController {
     @GetMapping("/getServices")
     public ResponseEntity<List<CourtServiceResponse>> getByCourtId(@RequestParam String  courtId) {
         return ResponseEntity.ok(courtServiceService.getCourtServicesByCourtId(courtId));
+    }
+
+    @GetMapping("/getServices/map")
+    public ResponseEntity<List<CourtServiceMap>> getServiceMap(@RequestParam String courtId) {
+        List<CourtServiceMap> simpleList = courtServiceService
+                .getCourtServicesByCourtId(courtId)
+                .stream()
+                .map(service -> CourtServiceMap.builder().id(service.getId()).name(service.getName()).build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(simpleList);
     }
 
     @PostMapping("/service/purchase")
@@ -140,5 +159,15 @@ public class PublicController {
     public ResponseEntity<List<String>> getCourtIds() {
         List<String> courtIds = courtService.getAllCourtIds();
         return ResponseEntity.ok(courtIds);
+    }
+
+    @GetMapping("/getCourtMap")
+    public ResponseEntity<List<CourtMap>> getAllCourts() {
+        List<CourtMap> simpleList = courtService.getAllCourts()
+                .stream()
+                .map(courts -> CourtMap.builder().id(courts.getId()).name(courts.getName()).address(courts.getAddress()).build())
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(simpleList);
     }
 }

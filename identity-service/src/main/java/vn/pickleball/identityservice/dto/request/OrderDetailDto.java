@@ -12,7 +12,6 @@ import java.time.LocalTime;
 @AllArgsConstructor
 public class OrderDetailDto {
     private String courtSlotId;
-    private String courtSlotName;
     private LocalTime startTime;
     private LocalTime endTime;
     private BigDecimal price;

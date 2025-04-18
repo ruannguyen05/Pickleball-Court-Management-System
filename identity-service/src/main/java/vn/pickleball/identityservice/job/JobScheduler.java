@@ -31,7 +31,7 @@ public class JobScheduler {
     @Scheduled(cron = "0 */30 * * * ?") // Runs every 30 minutes at :00 and :30
     public void checkUpcomingBookings() {
         try {
-            notificationService.checkAndSendUpcomingBookingNotifications();
+            orderService.checkAndSendUpcomingBookingNotifications();
         } catch (Exception e) {
             log.error("Error in scheduled job: {}", e.getMessage(), e);
         }

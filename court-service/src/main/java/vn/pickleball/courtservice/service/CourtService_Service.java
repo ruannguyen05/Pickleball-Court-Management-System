@@ -20,14 +20,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class CourtService_Service {
-    private final CourtRepository courtRepository;
+    private final CourtService courtService;
     private final CourtServiceRepository courtServiceRepository;
     private final CourtServiceMapper courtServiceMapper;
     private final FirebaseStorageService firebaseStorageService;
 
     public CourtServiceResponse createCourtService(CourtServiceRequest request) {
-        Court court = courtRepository.findById(request.getCourtId())
-                .orElseThrow(() -> new RuntimeException("Court not found"));
+        Court court = courtService.getCourtByCourtId(request.getCourtId());
 
         CourtServiceEntity courtService = courtServiceMapper.toEntity(request);
         courtService.setCourt(court);
@@ -53,7 +52,7 @@ public class CourtService_Service {
     }
 
     public List<CourtServiceResponse> getCourtServicesByCourtId(String courtId) {
-        return courtServiceRepository.findByCourtId(courtId)
+        return courtServiceRepository.findActiveByCourtId(courtId)
                 .stream()
                 .map(courtServiceMapper::toResponse)
                 .collect(Collectors.toList());

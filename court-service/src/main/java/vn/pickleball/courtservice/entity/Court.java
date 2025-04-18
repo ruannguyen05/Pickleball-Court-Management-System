@@ -28,8 +28,6 @@ public class Court extends BaseEntity{
 
     private String link;
 
-    private String managerId;
-
     private String logoUrl;
 
     private String backgroundUrl;

@@ -51,7 +51,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
     @Query("SELECT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
-            "WHERE (:courtId IS NULL OR o.courtId = :courtId) " +
+            "WHERE (:courtIds IS NULL OR o.courtId IN :courtIds) " +
             "AND (:orderType IS NULL OR o.orderType = :orderType) " +
             "AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus) " +
             "AND (:paymentStatus IS NULL OR o.paymentStatus = :paymentStatus) " +
@@ -59,7 +59,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
             "AND (:endDate IS NULL OR bd.bookingDate <= :endDate) " +
             "ORDER BY o.createdAt DESC")
     Page<Order> findOrders(
-            @Param("courtId") String courtId,
+            @Param("courtIds") List<String> courtIds,
             @Param("orderType") String orderType,
             @Param("orderStatus") String orderStatus,
             @Param("paymentStatus") String paymentStatus,
@@ -71,14 +71,14 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
     @Query("SELECT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
-            "WHERE (:courtId IS NULL OR o.courtId = :courtId) " +
+            "WHERE (:courtIds IS NULL OR o.courtId IN :courtIds) " +
             "AND (:orderType IS NULL OR o.orderType = :orderType) " +
             "AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus) " +
             "AND (:paymentStatus IS NULL OR o.paymentStatus = :paymentStatus) " +
             "AND (:startDate IS NULL OR bd.bookingDate >= :startDate) " +
             "AND (:endDate IS NULL OR bd.bookingDate <= :endDate)")
     List<Order> findOrdersByFilters(
-            @Param("courtId") String courtId,
+            @Param("courtIds") List<String> courtIds,
             @Param("orderType") String orderType,
             @Param("orderStatus") String orderStatus,
             @Param("paymentStatus") String paymentStatus,
@@ -87,7 +87,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
 
 
 
-    @Query("SELECT DISTINCT od.courtSlotName, bd.bookingDate FROM OrderDetail od " +
+    @Query("SELECT DISTINCT od.courtSlotId, bd.bookingDate FROM OrderDetail od " +
             "JOIN od.bookingDates bd " +
             "JOIN od.order o " +
             "WHERE o.courtId = :courtId " +
@@ -110,27 +110,12 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
             @Param("statuses") List<String> statuses,
             @Param("bookingDate") LocalDate bookingDate);
 
-    @Query("SELECT DISTINCT o FROM Order o " +
-            "JOIN o.orderDetails od " +
-            "JOIN od.bookingDates bd " +
-            "WHERE bd.bookingDate = :bookingDate " +
-            "AND o.courtId = :courtId " +
-            "AND o.orderStatus IN :statuses " +
-            "AND (:startTime IS NULL OR od.startTime >= :startTime) " +
-            "AND (:endTime IS NULL OR od.endTime <= :endTime) " +
-            "ORDER BY o.createdAt DESC")
-    List<Order> findOrdersWithDetailsByBookingDateAndTimeRange(
-            @Param("bookingDate") LocalDate bookingDate,
-            @Param("courtId") String courtId,
-            @Param("statuses") List<String> statuses,
-            @Param("startTime") LocalTime startTime,
-            @Param("endTime") LocalTime endTime);
 
     @Query("SELECT DISTINCT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
             "WHERE bd.bookingDate = :bookingDate " +
-            "AND o.courtId = :courtId " +
+            "AND (:courtIds IS NULL OR o.courtId IN :courtIds) " +
             "AND o.orderStatus IN :statuses " +
             "AND o.orderType <> 'Đơn cố định' " +
             "AND (:startTime IS NULL OR od.startTime >= :startTime) " +
@@ -140,7 +125,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
             "ORDER BY o.createdAt DESC")
     Page<Order> findOrdersWithFiltersByStaff(
             @Param("bookingDate") LocalDate bookingDate,
-            @Param("courtId") String courtId,
+            @Param("courtIds") List<String> courtIds,
             @Param("statuses") List<String> statuses,
             @Param("startTime") LocalTime startTime,
             @Param("endTime") LocalTime endTime,
@@ -148,19 +133,6 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
             @Param("customerName") String customerName,
             Pageable pageable);
 
-    @Query("SELECT DISTINCT o FROM Order o " +
-            "JOIN o.orderDetails od " +
-            "JOIN od.bookingDates bd " +
-            "WHERE bd.bookingDate = :bookingDate " +
-            "AND o.courtId = :courtId " +
-            "AND o.phoneNumber = :phoneNumber " +
-            "AND o.orderStatus IN :statuses " +
-            "ORDER BY o.createdAt DESC")
-    List<Order> findByBookingDateAndPhoneNumberWithStatus(
-            @Param("bookingDate") LocalDate bookingDate,
-            @Param("phoneNumber") String phoneNumber,
-            @Param("courtId") String courtId,
-            @Param("statuses") List<String> statuses);
 
 
     @Query("SELECT o FROM Order o WHERE o.id = :orderId AND o.orderStatus IN :orderStatuses AND o.paymentStatus = :paymentStatuses")
