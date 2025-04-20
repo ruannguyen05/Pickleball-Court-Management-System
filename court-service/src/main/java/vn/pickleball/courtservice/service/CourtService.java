@@ -6,8 +6,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -15,10 +13,10 @@ import vn.pickleball.courtservice.Utils.SecurityContextUtil;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtMapper;
-import vn.pickleball.courtservice.model.request.CourtRequest;
-import vn.pickleball.courtservice.model.response.CourtDetail;
-import vn.pickleball.courtservice.model.response.CourtResponse;
-import vn.pickleball.courtservice.model.response.PageResponse;
+import vn.pickleball.courtservice.dto.request.CourtRequest;
+import vn.pickleball.courtservice.dto.response.CourtDetail;
+import vn.pickleball.courtservice.dto.response.CourtResponse;
+import vn.pickleball.courtservice.dto.response.PageResponse;
 import vn.pickleball.courtservice.repository.CourtRepository;
 import vn.pickleball.courtservice.repository.pagination.PaginationCriteria;
 
@@ -59,17 +57,25 @@ public class CourtService {
 
 
     // Read (Get All court is active)
-    public List<CourtResponse> getAllCourts() {
+    public List<CourtResponse> getAllCourtsActive() {
         List<Court> courts = courtRepository.findAllActiveCourts();
         return courts.stream()
                 .map(courtMapper::courtToCourtResponse)
                 .collect(Collectors.toList());
     }
 
-    @PreAuthorize("hasRole('MANAGER')")
-    public List<CourtResponse> getCourtsByManagerId() {
+    public List<CourtResponse> getAllCourts() {
+        List<Court> courts = courtRepository.findAll();
+        return courts.stream()
+                .map(courtMapper::courtToCourtResponse)
+                .collect(Collectors.toList());
+    }
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public List<CourtResponse> getCourtsManage() {
+        boolean isAdmin = SecurityContextUtil.isAdmin();
         String managerId = SecurityContextUtil.getUid();
-        List<Court> courts = courtRepository.findAllById(getCourtIdsByUserId(managerId));
+        List<Court> courts = isAdmin ? courtRepository.findAll() : courtRepository.findAllById(getCourtIdsByUserId(managerId));
         return courts.stream()
                 .map(courtMapper::courtToCourtResponse)
                 .collect(Collectors.toList());
@@ -138,7 +144,6 @@ public class CourtService {
     }
 
     public PageResponse<CourtResponse> getAllPageable(int page, int pageSize, String search) {
-        String tenantId = SecurityContextUtil.getUid();
 
         int offset = Math.max(0, (page - 1) * pageSize);
 

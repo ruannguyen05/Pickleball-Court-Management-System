@@ -2,20 +2,16 @@ package vn.pickleball.courtservice.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import vn.pickleball.courtservice.entity.Court;
-import vn.pickleball.courtservice.model.request.CourtRequest;
-import vn.pickleball.courtservice.model.response.CourtDetail;
-import vn.pickleball.courtservice.model.response.CourtResponse;
-import vn.pickleball.courtservice.model.response.PageResponse;
-import vn.pickleball.courtservice.repository.CourtRepository;
-import vn.pickleball.courtservice.service.CourtImageService;
+import vn.pickleball.courtservice.dto.request.CourtRequest;
+import vn.pickleball.courtservice.dto.response.CourtDetail;
+import vn.pickleball.courtservice.dto.response.CourtResponse;
+import vn.pickleball.courtservice.dto.response.PageResponse;
 import vn.pickleball.courtservice.service.CourtService;
-import vn.pickleball.courtservice.service.FirebaseStorageService;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -33,6 +29,13 @@ public class CourtController {
 
     // Read (Get All)
     @GetMapping("/public/getAll")
+    public ResponseEntity<List<CourtResponse>> getAllCourtsActive() {
+        List<CourtResponse> courtResponses = courtService.getAllCourtsActive();
+        return ResponseEntity.ok(courtResponses);
+    }
+
+    @GetMapping("/manage/getAll")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<CourtResponse>> getAllCourts() {
         List<CourtResponse> courtResponses = courtService.getAllCourts();
         return ResponseEntity.ok(courtResponses);
@@ -48,9 +51,9 @@ public class CourtController {
         return ResponseEntity.notFound().build();
     }
 
-    @GetMapping("/getCourtsByManager")
+    @GetMapping("/getCourtsManage")
     public ResponseEntity<List<CourtResponse>>  getCourtsByManager() {
-        List<CourtResponse> courtResponses = courtService.getCourtsByManagerId();
+        List<CourtResponse> courtResponses = courtService.getCourtsManage();
         return ResponseEntity.ok(courtResponses);
     }
 

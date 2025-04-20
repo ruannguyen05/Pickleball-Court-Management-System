@@ -5,12 +5,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import vn.pickleball.courtservice.entity.Court;
-import vn.pickleball.courtservice.model.request.CourtServiceRequest;
-import vn.pickleball.courtservice.model.response.CourtServiceResponse;
+import vn.pickleball.courtservice.dto.request.CourtServiceRequest;
+import vn.pickleball.courtservice.dto.response.CourtServiceResponse;
 import vn.pickleball.courtservice.service.CourtService_Service;
 
-import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -43,6 +41,12 @@ public class CourtServiceController {
     public ResponseEntity<?> uploadBackground(@RequestParam String serviceId, @RequestParam("file") MultipartFile file) {
         courtServiceService.uploadImage(serviceId,file);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/manage/getServices")
+    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtId)")
+    public ResponseEntity<List<CourtServiceResponse>> getByCourtId(@RequestParam String  courtId) {
+        return ResponseEntity.ok(courtServiceService.getAllCourtServicesByCourtId(courtId));
     }
 }
 

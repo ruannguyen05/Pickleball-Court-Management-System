@@ -12,11 +12,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 import vn.pickleball.courtservice.entity.CourtMaintenanceHistory;
 import vn.pickleball.courtservice.entity.CourtSlot;
 import vn.pickleball.courtservice.exception.ApiException;
-import vn.pickleball.courtservice.model.request.CourtMaintenanceHistoryRequestDTO;
-import vn.pickleball.courtservice.model.request.UpdateBookingSlot;
-import vn.pickleball.courtservice.model.response.CourtMaintenanceHistoryResponseDTO;
+import vn.pickleball.courtservice.dto.request.CourtMaintenanceHistoryRequestDTO;
+import vn.pickleball.courtservice.dto.request.UpdateBookingSlot;
+import vn.pickleball.courtservice.dto.response.CourtMaintenanceHistoryResponseDTO;
 import vn.pickleball.courtservice.repository.CourtMaintenanceHistoryRepository;
-import vn.pickleball.courtservice.repository.CourtSlotRepository;
 
 import java.sql.Timestamp;
 import java.time.Duration;

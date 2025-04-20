@@ -51,6 +51,8 @@ public class PaginationCriteria {
     private List<Predicate> buildPredicates(CriteriaBuilder criteriaBuilder, Root<Court> root, String search) {
         List<Predicate> predicates = new ArrayList<>();
 
+        predicates.add(criteriaBuilder.isTrue(root.get("isActive")));
+
 
         if (!search.isEmpty()) {
             predicates.add(criteriaBuilder.or(

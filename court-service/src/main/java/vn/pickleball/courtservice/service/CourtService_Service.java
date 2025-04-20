@@ -7,10 +7,9 @@ import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtServiceEntity;
 import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtServiceMapper;
-import vn.pickleball.courtservice.model.request.CourtServicePurchaseRequest;
-import vn.pickleball.courtservice.model.request.CourtServiceRequest;
-import vn.pickleball.courtservice.model.response.CourtServiceResponse;
-import vn.pickleball.courtservice.repository.CourtRepository;
+import vn.pickleball.courtservice.dto.request.CourtServicePurchaseRequest;
+import vn.pickleball.courtservice.dto.request.CourtServiceRequest;
+import vn.pickleball.courtservice.dto.response.CourtServiceResponse;
 import vn.pickleball.courtservice.repository.CourtServiceRepository;
 
 import java.io.IOException;
@@ -53,6 +52,13 @@ public class CourtService_Service {
 
     public List<CourtServiceResponse> getCourtServicesByCourtId(String courtId) {
         return courtServiceRepository.findActiveByCourtId(courtId)
+                .stream()
+                .map(courtServiceMapper::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CourtServiceResponse> getAllCourtServicesByCourtId(String courtId) {
+        return courtServiceRepository.findByCourtId(courtId)
                 .stream()
                 .map(courtServiceMapper::toResponse)
                 .collect(Collectors.toList());

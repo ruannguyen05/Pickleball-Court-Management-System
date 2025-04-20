@@ -1,24 +1,20 @@
 package vn.pickleball.courtservice.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtPrice;
 import vn.pickleball.courtservice.entity.TimeSlot;
 import vn.pickleball.courtservice.exception.ApiException;
-import vn.pickleball.courtservice.mapper.CourtPriceMapper;
 import vn.pickleball.courtservice.mapper.TimeSlotMapper;
-import vn.pickleball.courtservice.model.WeekType;
-import vn.pickleball.courtservice.model.request.BookingPaymentRequest;
-import vn.pickleball.courtservice.model.request.CourtPriceRequest;
-import vn.pickleball.courtservice.model.request.TimeSlotRequest;
-import vn.pickleball.courtservice.model.response.CourtPriceResponse;
-import vn.pickleball.courtservice.model.response.TimeSlotResponse;
+import vn.pickleball.courtservice.dto.WeekType;
+import vn.pickleball.courtservice.dto.request.BookingPaymentRequest;
+import vn.pickleball.courtservice.dto.request.CourtPriceRequest;
+import vn.pickleball.courtservice.dto.request.TimeSlotRequest;
+import vn.pickleball.courtservice.dto.response.CourtPriceResponse;
+import vn.pickleball.courtservice.dto.response.TimeSlotResponse;
 import vn.pickleball.courtservice.repository.CourtPriceRepository;
-import vn.pickleball.courtservice.repository.CourtRepository;
-import vn.pickleball.courtservice.repository.TimeSlotRepository;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;

@@ -19,6 +19,25 @@ public class SecurityContextUtil {
         return getClaim("uid");
     }
 
+    public static boolean isAdmin(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+    }
+
+    public static boolean isManager(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_MANAGER"));
+    }
+
+
+    public static boolean isStaff(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_STAFF"));
+    }
+
     public static String getUsername() {
         Authentication authentication = getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof Jwt) {

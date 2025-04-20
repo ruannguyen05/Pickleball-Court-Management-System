@@ -2,11 +2,12 @@ package vn.pickleball.courtservice.controller;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import vn.pickleball.courtservice.model.request.CourtMaintenanceHistoryRequestDTO;
-import vn.pickleball.courtservice.model.request.CourtSlotRequest;
-import vn.pickleball.courtservice.model.response.CourtMaintenanceHistoryResponseDTO;
-import vn.pickleball.courtservice.model.response.CourtSlotResponse;
+import vn.pickleball.courtservice.dto.request.CourtMaintenanceHistoryRequestDTO;
+import vn.pickleball.courtservice.dto.request.CourtSlotRequest;
+import vn.pickleball.courtservice.dto.response.CourtMaintenanceHistoryResponseDTO;
+import vn.pickleball.courtservice.dto.response.CourtSlotResponse;
 import vn.pickleball.courtservice.service.CourtMaintenanceHistoryService;
 import vn.pickleball.courtservice.service.CourtSlotService;
 
@@ -63,8 +64,14 @@ public class CourtSlotController {
     }
 
     @GetMapping("/court/{courtId}")
-    public ResponseEntity<List<CourtSlotResponse>> getCourtSlotsByCourtId(@PathVariable String courtId) {
+    public ResponseEntity<List<CourtSlotResponse>> getCourtSlotsActiveByCourtId(@PathVariable String courtId) {
         List<CourtSlotResponse> courtSlotResponses = courtSlotService.getCourtSlotsByCourtId(courtId);
+        return ResponseEntity.ok(courtSlotResponses);
+    }
+    @GetMapping("/manage/court/{courtId}")
+    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtId)")
+    public ResponseEntity<List<CourtSlotResponse>> getCourtSlotsByCourtId(@PathVariable String courtId) {
+        List<CourtSlotResponse> courtSlotResponses = courtSlotService.getAllCourtSlotsByCourtId(courtId);
         return ResponseEntity.ok(courtSlotResponses);
     }
 

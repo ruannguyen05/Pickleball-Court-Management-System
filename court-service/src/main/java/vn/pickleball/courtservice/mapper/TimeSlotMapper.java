@@ -1,12 +1,9 @@
 package vn.pickleball.courtservice.mapper;
 
 import org.mapstruct.*;
-import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.TimeSlot;
-import vn.pickleball.courtservice.model.request.CourtRequest;
-import vn.pickleball.courtservice.model.request.TimeSlotRequest;
-import vn.pickleball.courtservice.model.response.CourtResponse;
-import vn.pickleball.courtservice.model.response.TimeSlotResponse;
+import vn.pickleball.courtservice.dto.request.TimeSlotRequest;
+import vn.pickleball.courtservice.dto.response.TimeSlotResponse;
 
 import java.util.List;
 

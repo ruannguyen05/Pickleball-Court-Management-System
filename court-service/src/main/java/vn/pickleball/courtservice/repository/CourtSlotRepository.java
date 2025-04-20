@@ -11,7 +11,10 @@ import java.util.Optional;
 
 public interface CourtSlotRepository extends JpaRepository<CourtSlot, String> {
     List<CourtSlot> findByCourtIdOrderByCreatedAtAsc(String courtId);
-    List<CourtSlot> findByCourtId(String courtId);
+
+    @Query("SELECT cs FROM CourtSlot cs WHERE cs.court.id = :courtId")
+    List<CourtSlot> findByCourtId(@Param("courtId") String courtId);
+
     @Query("SELECT cs FROM CourtSlot cs WHERE cs.court.id = :courtId AND cs.isActive = true")
     List<CourtSlot> findActiveByCourtId(@Param("courtId") String courtId);
 

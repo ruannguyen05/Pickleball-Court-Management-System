@@ -3,10 +3,9 @@ package vn.pickleball.courtservice.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtPrice;
 import vn.pickleball.courtservice.entity.TimeSlot;
-import vn.pickleball.courtservice.model.WeekType;
+import vn.pickleball.courtservice.dto.WeekType;
 
 import java.util.List;
 

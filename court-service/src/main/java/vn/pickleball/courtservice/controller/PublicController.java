@@ -5,8 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.courtservice.entity.CourtImage;
-import vn.pickleball.courtservice.model.request.*;
-import vn.pickleball.courtservice.model.response.*;
+import vn.pickleball.courtservice.dto.request.*;
+import vn.pickleball.courtservice.dto.response.*;
 import vn.pickleball.courtservice.service.*;
 
 import java.io.IOException;
@@ -49,7 +49,7 @@ public class PublicController {
 
     @GetMapping("/getCourtSlot/map")
     public ResponseEntity<List<CourtSlotMap>> getCourtSlotMap(@RequestParam String courtId) {
-        List<CourtSlotMap> simpleList = courtSlotService.getCourtSlotsByCourtId(courtId)
+        List<CourtSlotMap> simpleList = courtSlotService.getAllCourtSlotsByCourtId(courtId)
                 .stream()
                 .map(slot -> CourtSlotMap.builder().courtSlotId(slot.getId()).courtSlotName(slot.getName()).build())
                 .collect(Collectors.toList());
@@ -66,13 +66,13 @@ public class PublicController {
         return ResponseEntity.ok(courtSlotIds);
     }
 
-    @GetMapping("/court_price/getByCourtId/{courtId}")
+    @GetMapping("/court_price/getByCourtId/{courtId}") //*
     public ResponseEntity<CourtPriceResponse> getCourtPriceByCourtId(@PathVariable String courtId) {
         CourtPriceResponse courtPriceResponse = courtPriceService.getCourtPriceByCourtId(courtId);
         return ResponseEntity.ok(courtPriceResponse);
     }
 
-    @GetMapping("/booking_slot")
+    @GetMapping("/booking_slot") //*
     public ResponseEntity<List<CourtSlotBookingResponse>> getBookingSlots(
             @RequestParam String courtId,
             @RequestParam LocalDate dateBooking
@@ -89,14 +89,14 @@ public class PublicController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/court-images/list")
+    @GetMapping("/court-images/list") //*
     public ResponseEntity<List<CourtImage>> getCourtImages(
             @RequestParam("courtId") String courtId,
             @RequestParam("isMap") boolean isMap) {
         return ResponseEntity.ok(courtImageService.getCourtImages(courtId, isMap));
     }
 
-    @GetMapping("/getServices")
+    @GetMapping("/getServices") //*
     public ResponseEntity<List<CourtServiceResponse>> getByCourtId(@RequestParam String  courtId) {
         return ResponseEntity.ok(courtServiceService.getCourtServicesByCourtId(courtId));
     }
@@ -104,7 +104,7 @@ public class PublicController {
     @GetMapping("/getServices/map")
     public ResponseEntity<List<CourtServiceMap>> getServiceMap(@RequestParam String courtId) {
         List<CourtServiceMap> simpleList = courtServiceService
-                .getCourtServicesByCourtId(courtId)
+                .getAllCourtServicesByCourtId(courtId)
                 .stream()
                 .map(service -> CourtServiceMap.builder().id(service.getId()).name(service.getName()).build())
                 .collect(Collectors.toList());

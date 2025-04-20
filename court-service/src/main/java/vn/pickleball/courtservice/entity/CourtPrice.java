@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.hibernate.annotations.UuidGenerator;
-import vn.pickleball.courtservice.model.WeekType;
+import vn.pickleball.courtservice.dto.WeekType;
 
 import java.math.BigDecimal;
 

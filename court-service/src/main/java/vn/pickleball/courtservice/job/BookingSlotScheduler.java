@@ -7,9 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import vn.pickleball.courtservice.model.BookingStatus;
-import vn.pickleball.courtservice.model.response.BookingSlotResponse;
-import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
+import vn.pickleball.courtservice.dto.BookingStatus;
+import vn.pickleball.courtservice.dto.response.BookingSlotResponse;
+import vn.pickleball.courtservice.dto.response.CourtSlotBookingResponse;
 
 import java.time.LocalDate;
 import java.time.LocalTime;

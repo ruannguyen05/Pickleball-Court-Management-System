@@ -1,14 +1,9 @@
 package vn.pickleball.courtservice.mapper;
 
 import org.mapstruct.*;
-import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtSlot;
-import vn.pickleball.courtservice.model.request.CourtRequest;
-import vn.pickleball.courtservice.model.request.CourtSlotRequest;
-import vn.pickleball.courtservice.model.response.CourtResponse;
-import vn.pickleball.courtservice.model.response.CourtSlotResponse;
-
-import java.util.List;
+import vn.pickleball.courtservice.dto.request.CourtSlotRequest;
+import vn.pickleball.courtservice.dto.response.CourtSlotResponse;
 
 @Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE, builder = @Builder(disableBuilder = true), imports = {String.class})
 public abstract class CourtSlotMapper {

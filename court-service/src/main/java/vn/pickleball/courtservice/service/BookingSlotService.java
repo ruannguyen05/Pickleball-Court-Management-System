@@ -3,7 +3,6 @@ package vn.pickleball.courtservice.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -13,19 +12,14 @@ import vn.pickleball.courtservice.entity.CourtPrice;
 import vn.pickleball.courtservice.entity.CourtSlot;
 import vn.pickleball.courtservice.entity.TimeSlot;
 import vn.pickleball.courtservice.exception.ApiException;
-import vn.pickleball.courtservice.mapper.TimeSlotMapper;
-import vn.pickleball.courtservice.model.BookingStatus;
-import vn.pickleball.courtservice.model.WeekType;
-import vn.pickleball.courtservice.model.request.UpdateBookingSlot;
-import vn.pickleball.courtservice.model.response.BookingSlotResponse;
-import vn.pickleball.courtservice.model.response.CourtSlotBookingResponse;
-import vn.pickleball.courtservice.repository.CourtPriceRepository;
-import vn.pickleball.courtservice.repository.CourtSlotRepository;
-import vn.pickleball.courtservice.repository.TimeSlotRepository;
+import vn.pickleball.courtservice.dto.BookingStatus;
+import vn.pickleball.courtservice.dto.WeekType;
+import vn.pickleball.courtservice.dto.request.UpdateBookingSlot;
+import vn.pickleball.courtservice.dto.response.BookingSlotResponse;
+import vn.pickleball.courtservice.dto.response.CourtSlotBookingResponse;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -79,11 +73,9 @@ public class BookingSlotService {
 
         // Tạo danh sách CourtSlotBookingResponse
         List<CourtSlotBookingResponse> bookingSlotsByCourtSlot = new ArrayList<>();
+        List<TimeSlot> timeSlots = timeSlotService.findByCourtIdOrderByStartTimeAsc(courtId);
 
         for (CourtSlot courtSlot : courtSlots) {
-            // Lấy tất cả TimeSlot của CourtSlot
-            List<TimeSlot> timeSlots = timeSlotService.findByCourtIdOrderByStartTimeAsc(courtSlot.getCourt().getId());
-
             // Tạo danh sách BookingSlotResponse cho từng CourtSlot
             List<BookingSlotResponse> bookingSlots = new ArrayList<>();
 

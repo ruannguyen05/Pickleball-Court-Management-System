@@ -24,8 +24,7 @@ public class AuthorizationService {
             return false;
         }
 
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = SecurityContextUtil.isAdmin();
 
         if (isAdmin) {
             return true;

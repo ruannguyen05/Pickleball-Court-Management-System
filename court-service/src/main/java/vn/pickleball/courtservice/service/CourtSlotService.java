@@ -4,18 +4,15 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vn.pickleball.courtservice.Utils.AuthorizationService;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtSlot;
 import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.mapper.CourtSlotMapper;
-import vn.pickleball.courtservice.model.request.CourtSlotRequest;
-import vn.pickleball.courtservice.model.response.CourtSlotResponse;
-import vn.pickleball.courtservice.repository.CourtRepository;
+import vn.pickleball.courtservice.dto.request.CourtSlotRequest;
+import vn.pickleball.courtservice.dto.response.CourtSlotResponse;
 import vn.pickleball.courtservice.repository.CourtSlotRepository;
 
 import java.util.List;
@@ -109,6 +106,13 @@ public class CourtSlotService {
     }
 
     public List<CourtSlotResponse> getCourtSlotsByCourtId(String courtId) {
+        List<CourtSlot> courtSlots = courtSlotRepository.findActiveByCourtId(courtId);
+        return courtSlots.stream()
+                .map(courtSlotMapper::courtSlotToCourtSlotResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<CourtSlotResponse> getAllCourtSlotsByCourtId(String courtId) {
         List<CourtSlot> courtSlots = courtSlotRepository.findByCourtId(courtId);
         return courtSlots.stream()
                 .map(courtSlotMapper::courtSlotToCourtSlotResponse)

@@ -1,11 +1,10 @@
 package vn.pickleball.courtservice.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import vn.pickleball.courtservice.model.request.CourtPriceRequest;
-import vn.pickleball.courtservice.model.response.CourtPriceResponse;
+import vn.pickleball.courtservice.dto.request.CourtPriceRequest;
+import vn.pickleball.courtservice.dto.response.CourtPriceResponse;
 import vn.pickleball.courtservice.service.CourtPriceService;
 
 @RestController
