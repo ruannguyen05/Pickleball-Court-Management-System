@@ -19,6 +19,12 @@ public class SecurityContextUtil {
         return getClaim("uid");
     }
 
+    public static boolean isAdmin(){
+        Authentication authentication = getAuthentication();
+        return authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+    }
+
     public static boolean isManager(){
         Authentication authentication = getAuthentication();
         return authentication.getAuthorities().stream()

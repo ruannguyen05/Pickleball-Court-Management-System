@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.model.response;
+package vn.pickleball.courtservice.dto.response;
 
 import lombok.Data;
 

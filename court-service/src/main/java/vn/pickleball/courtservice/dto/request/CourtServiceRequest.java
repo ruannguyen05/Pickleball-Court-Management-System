@@ -1,9 +1,9 @@
-package vn.pickleball.courtservice.model.response;
+package vn.pickleball.courtservice.dto.request;
 
 import lombok.Data;
 
 @Data
-public class CourtServiceResponse {
+public class CourtServiceRequest {
     private String id;
     private String courtId;
     private String category;

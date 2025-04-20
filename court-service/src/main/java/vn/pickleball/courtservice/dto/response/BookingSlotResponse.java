@@ -1,8 +1,8 @@
-package vn.pickleball.courtservice.model.response;
+package vn.pickleball.courtservice.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
-import vn.pickleball.courtservice.model.BookingStatus;
+import vn.pickleball.courtservice.dto.BookingStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalTime;

@@ -30,7 +30,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
 //            List<String> orderStatuses, String courtId, LocalDate bookingDate
 //    );
 
-    @Query("SELECT o FROM Order o " +
+    @Query("SELECT DISTINCT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
             "WHERE o.courtId = :courtId " +
@@ -48,7 +48,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
 
     List<Order> findByPaymentStatus(String status);
 
-    @Query("SELECT o FROM Order o " +
+    @Query("SELECT DISTINCT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
             "WHERE (:courtIds IS NULL OR o.courtId IN :courtIds) " +
@@ -68,7 +68,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
             Pageable pageable
     );
 
-    @Query("SELECT o FROM Order o " +
+    @Query("SELECT DISTINCT o FROM Order o " +
             "JOIN o.orderDetails od " +
             "JOIN od.bookingDates bd " +
             "WHERE (:courtIds IS NULL OR o.courtId IN :courtIds) " +

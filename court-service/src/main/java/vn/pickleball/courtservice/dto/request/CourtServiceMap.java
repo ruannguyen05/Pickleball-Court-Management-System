@@ -1,12 +1,11 @@
-package vn.pickleball.courtservice.model.request;
+package vn.pickleball.courtservice.dto.request;
 
 import lombok.Builder;
 import lombok.Data;
 
 @Data
 @Builder
-public class CourtMap {
+public class CourtServiceMap {
     private String id;
     private String name;
-    private String address;
 }

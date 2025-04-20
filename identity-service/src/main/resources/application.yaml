@@ -45,8 +45,8 @@ spring:
 
 jwt:
   signerKey: ${JWT_KEY:${DEFAULT.JWT_KEY}}
-  valid-duration: 7200000 # in second
-  refreshable-duration: 7200000 # in seconds
+  valid-duration: 43200
+  refreshable-duration: 21600
 
 payment:
   url : https://payment.omnipay.vn/api

@@ -28,8 +28,10 @@ import vn.pickleball.identityservice.client.CourtClient;
 import vn.pickleball.identityservice.constant.PredefinedRole;
 import vn.pickleball.identityservice.dto.payment.NotificationResponse;
 import vn.pickleball.identityservice.dto.request.ChangePasswordRequest;
+import vn.pickleball.identityservice.dto.request.CourtMap;
 import vn.pickleball.identityservice.dto.request.UserCreationRequest;
 import vn.pickleball.identityservice.dto.request.UserUpdateRequest;
+import vn.pickleball.identityservice.dto.response.CourtManage;
 import vn.pickleball.identityservice.dto.response.PagedUserResponse;
 import vn.pickleball.identityservice.dto.response.UserResponse;
 import vn.pickleball.identityservice.entity.CourtStaff;
@@ -418,5 +420,18 @@ public class UserService {
 
     public List<String> getUsersByCourtId(String courtId){
         return courtStaffService.getUsersByCourtId(courtId);
+    }
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public List<CourtManage> getCourtManage() {
+        List<String> courtIdsManage = courtStaffService.getCourtsByUserId(SecurityContextUtil.getUid());
+        List<CourtMap> courts = courtClient.getAllCourts().getBody();
+
+        boolean isAdmin = SecurityContextUtil.isAdmin();
+
+        return courts.stream()
+                .filter(court -> isAdmin || courtIdsManage.contains(court.getId()))
+                .map(court -> new CourtManage(court.getId(), court.getName()))
+                .collect(Collectors.toList());
     }
 }

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,18 +55,13 @@ public class DashboardService {
 
         List<String> courtIds;
 
-        // Determine court IDs based on role and request
         if (courtId != null) {
-            // Case 3: Specific court ID provided
             courtIds = Collections.singletonList(getCourtIdManage(courtId));
         } else {
-            // Case 1 & 2: No court ID provided
             boolean isManager = SecurityContextUtil.isManager();
             if (isManager) {
-                // Case 2: MANAGER role
                 courtIds = getCourtIdsManage(null);
             } else {
-                // Case 1: ADMIN role
                 courtIds = courtClient.getCourtIds().getBody();
             }
         }
@@ -94,22 +90,17 @@ public class DashboardService {
 
         List<String> courtIds;
 
-        // Determine court IDs based on role and request
         if (courtId != null) {
-            // Case 3: Specific court ID provided
             courtIds = Collections.singletonList(getCourtIdManage(courtId));
         } else {
-            // Case 1 & 2: No court ID provided
             boolean isManager = SecurityContextUtil.isManager();
             if (isManager) {
-                // Case 2: MANAGER role
                 courtIds = getCourtIdsManage(null);
             } else {
-                // Case 1: ADMIN role
                 courtIds = courtClient.getCourtIds().getBody();
             }
         }
-        var ordersPage = orderService.getOrders(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate, page, size);
+        Page<Order> ordersPage = orderService.getOrders(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate, page, size);
 
         List<OrderData> orderData = orderMapCustom.toOrderDataList(ordersPage.getContent());
 

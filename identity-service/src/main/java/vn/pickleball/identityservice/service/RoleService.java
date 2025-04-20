@@ -12,9 +12,11 @@ import vn.pickleball.identityservice.entity.Role;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.RoleMapper;
 import vn.pickleball.identityservice.repository.RoleRepository;
+import vn.pickleball.identityservice.utils.SecurityContextUtil;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,8 +46,19 @@ public class RoleService {
         return roleMapper.toRoleResponse(role);
     }
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public List<RoleResponse> getAll() {
-        return roleRepository.findRolesWithoutAdmin("ADMIN").stream().map(roleMapper::toRoleResponse).toList();
+        List<Role> roles = roleRepository.findRolesWithoutAdmin("ADMIN");
+        // Nếu là MANAGER thì lọc bỏ role MANAGER
+        if (SecurityContextUtil.isManager()) {
+            roles = roles.stream()
+                    .filter(role -> !role.getName().equals("MANAGER"))
+                    .collect(Collectors.toList());
+        }
+
+        return roles.stream()
+                .map(roleMapper::toRoleResponse)
+                .collect(Collectors.toList());
     }
 
     public void delete(String role) {

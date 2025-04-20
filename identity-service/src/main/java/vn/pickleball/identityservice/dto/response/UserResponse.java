@@ -6,6 +6,7 @@ import vn.pickleball.identityservice.dto.Gender;
 import vn.pickleball.identityservice.dto.UserRank;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -31,4 +32,6 @@ public class UserResponse {
     private String avatar;
 
     private boolean isActive;
+
+    List<String> courtNames;
 }

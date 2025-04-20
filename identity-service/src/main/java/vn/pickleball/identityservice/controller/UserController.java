@@ -12,6 +12,7 @@ import vn.pickleball.identityservice.dto.request.ApiResponse;
 import vn.pickleball.identityservice.dto.request.ChangePasswordRequest;
 import vn.pickleball.identityservice.dto.request.UserCreationRequest;
 import vn.pickleball.identityservice.dto.request.UserUpdateRequest;
+import vn.pickleball.identityservice.dto.response.CourtManage;
 import vn.pickleball.identityservice.dto.response.PagedUserResponse;
 import vn.pickleball.identityservice.dto.response.UserResponse;
 import vn.pickleball.identityservice.service.UserService;
@@ -127,6 +128,11 @@ public class UserController {
     public ResponseEntity<String> updateUserStatus(@RequestParam String userId, @RequestParam boolean isActive) {
         userService.updateUserStatus(userId, isActive);
         return ResponseEntity.ok(isActive ? "User activated successfully" : "User disabled successfully");
+    }
+
+    @GetMapping("/getCourtManage")
+    public List<CourtManage> getCourtMange(){
+        return userService.getCourtManage();
     }
 
 }

@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.model.request;
+package vn.pickleball.courtservice.dto.request;
 
 import lombok.Data;
 
@@ -7,7 +7,7 @@ import java.time.LocalTime;
 
 @Data
 public class TimeSlotRequest {
-    private String id; // ID của timeSlot (nếu có)
+    private String id;
     private LocalTime startTime;
     private LocalTime endTime;
     private BigDecimal regularPrice;

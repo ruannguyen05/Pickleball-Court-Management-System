@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.model;
+package vn.pickleball.courtservice.dto;
 
 public enum WeekType {
     WEEKDAY,  // Thứ 2 - Thứ 6

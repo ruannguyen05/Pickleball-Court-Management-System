@@ -29,13 +29,13 @@ public class PublicController {
     private final UserService userService;
     private final EmailService emailService;
 
-    @PostMapping("/create_order")
+    @PostMapping("/create_order") //*
     public ResponseEntity<OrderResponse> createOrder(@Valid @RequestBody OrderRequest orderRequest) {
         OrderResponse orderResponse = orderService.createOrder(orderRequest);
         return ResponseEntity.ok(orderResponse);
     }
 
-    @PostMapping("/change_order")
+    @PostMapping("/change_order") //*
     public ResponseEntity<OrderResponse> changeOrder(@RequestParam String orderId,@Valid @RequestBody OrderRequest orderRequest) {
         OrderResponse orderResponse = orderService.changeOrder(orderRequest, orderId);
         return ResponseEntity.ok(orderResponse);
@@ -57,20 +57,20 @@ public class PublicController {
             return ResponseEntity.ok("REFUND_SUCCESS");
     }
 
-    @GetMapping("/getOrders")
+    @GetMapping("/getOrders") //*
     public ResponseEntity<List<OrderResponse>> getOrders(
             @RequestParam String value) {
 
         List<OrderResponse> orders = orderService.getOrders(value);
         return ResponseEntity.ok(orders);
     }
-    @GetMapping("/getOrderById")
+    @GetMapping("/getOrderById") //*
     public ResponseEntity<OrderResponse> getOrderById(
             @RequestParam String orderId) {
         return ResponseEntity.ok(orderService.getOrderById(orderId));
     }
 
-    @PutMapping("/cancelOrder")
+    @PutMapping("/cancelOrder") //*
     public ResponseEntity<OrderResponse> cancelOrder(
             @RequestParam String orderId) {
         return ResponseEntity.ok(orderService.cancelOrder(orderId));
@@ -89,7 +89,7 @@ public class PublicController {
     }
 
 
-    @GetMapping("/notification/getNotifications")
+    @GetMapping("/notification/getNotifications") //*
     public ResponseEntity<NotificationResponse> getAllNotifications(@RequestParam String value) {
         return ResponseEntity.ok(notificationService.getAllNotifications(value));
     }
@@ -151,13 +151,13 @@ public class PublicController {
         return orderService.getPaymentAmount(courtId,bookingDates,startTime,endTime);
     }
 
-    @PostMapping("/order-fixed")
+    @PostMapping("/order-fixed") //*
     public ResponseEntity<OrderResponse> createFixedBooking(@RequestBody @Valid FixedBookingRequest request) {
         OrderResponse response = orderService.createFixedBooking(request);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/paymentOrder")
+    @PostMapping("/paymentOrder") //*
     public ResponseEntity<String> paymentOrder(@RequestParam String orderId) {
         return ResponseEntity.ok(orderService.createPaymentOrder(orderId));
     }
@@ -168,12 +168,12 @@ public class PublicController {
         return ResponseEntity.ok("Maintenance notification sent successfully");
     }
 
-    @PostMapping("/order/service")
+    @PostMapping("/order/service") //*
     public ResponseEntity<OrderResponse> orderService(@RequestBody OrderServiceRequest request){
         return ResponseEntity.ok(orderService.createServiceOrder(request));
     }
 
-    @GetMapping("/getTransactionHistory")
+    @GetMapping("/getTransactionHistory") //*
     public List<TransactionHistory> getTransactionHistory(@RequestParam String orderId){
         return orderService.getTransactionHistory(orderId);
     }

@@ -1,4 +1,4 @@
-package vn.pickleball.courtservice.model;
+package vn.pickleball.courtservice.dto;
 
 public enum BookingStatus {
     AVAILABLE, // Trống

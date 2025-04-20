@@ -1,7 +1,7 @@
-package vn.pickleball.courtservice.model.request;
+package vn.pickleball.courtservice.dto.request;
 
 import lombok.Data;
-import vn.pickleball.courtservice.model.BookingStatus;
+import vn.pickleball.courtservice.dto.BookingStatus;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
