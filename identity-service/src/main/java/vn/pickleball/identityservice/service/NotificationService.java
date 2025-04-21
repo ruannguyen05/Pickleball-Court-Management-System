@@ -11,6 +11,7 @@ import vn.pickleball.identityservice.entity.*;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.NotificationMapper;
 import vn.pickleball.identityservice.mapper.OrderMapper;
+import vn.pickleball.identityservice.mapper.OrderMapperCustom;
 import vn.pickleball.identityservice.repository.NotificationRepository;
 import vn.pickleball.identityservice.repository.OrderRepository;
 import vn.pickleball.identityservice.repository.UserRepository;
@@ -34,7 +35,7 @@ public class NotificationService {
     private final UserService userService;
     private final FCMService fcmService;
     private final EmailService emailService;
-    private final OrderMapCustom orderMapCustom;
+    private final OrderMapperCustom orderMapperCustom;
 
     // Lưu thông báo mới
     public NotificationRequest saveNotification(NotificationRequest request, String phoneNumber) {
@@ -149,7 +150,7 @@ public class NotificationService {
 
     private void sendUpcomingBookingNotification(Order order, OrderDetail detail) {
         String title = "Bạn có lịch đặt sân sắp tới giờ";
-        OrderResponse orderResponse = orderMapCustom.toOrderResponse(order);
+        OrderResponse orderResponse = orderMapperCustom.toOrderResponse(order);
         String description = String.format(
                 "Bạn có lịch đặt sân %s sử dụng lúc %s",
                 orderResponse.getCourtName(),

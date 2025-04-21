@@ -18,6 +18,7 @@ import vn.pickleball.identityservice.dto.response.*;
 import vn.pickleball.identityservice.entity.*;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.OrderMapper;
+import vn.pickleball.identityservice.mapper.OrderMapperCustom;
 import vn.pickleball.identityservice.mapper.TransactionMapper;
 import vn.pickleball.identityservice.repository.OrderRepository;
 import vn.pickleball.identityservice.repository.OrderSpecification;
@@ -44,7 +45,7 @@ public class DashboardService {
     private final OrderService orderService;
     private final UserService userService;
     private final CourtClient courtClient;
-    private final OrderMapCustom orderMapCustom;
+    private final OrderMapperCustom orderMapperCustom;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
@@ -102,7 +103,7 @@ public class DashboardService {
         }
         Page<Order> ordersPage = orderService.getOrders(courtIds, orderType, orderStatus, paymentStatus, startDate, endDate, page, size);
 
-        List<OrderData> orderData = orderMapCustom.toOrderDataList(ordersPage.getContent());
+        List<OrderData> orderData = orderMapperCustom.toOrderDataList(ordersPage.getContent());
 
         return OrderPage.builder()
                 .orders(orderData)

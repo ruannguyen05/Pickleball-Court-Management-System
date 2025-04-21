@@ -1,4 +1,4 @@
-package vn.pickleball.identityservice.service;
+package vn.pickleball.identityservice.mapper;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class OrderMapCustom {
+public class OrderMapperCustom {
     private final CourtClient courtClient;
 
     public List<OrderDetailResponse> mapOrderDetailsToResponse(List<OrderDetail> orderDetails, Map<String, CourtSlotMap> courtSlotMap) {

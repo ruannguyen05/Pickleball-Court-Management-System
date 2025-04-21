@@ -204,7 +204,7 @@ public class UserService {
     public UserResponse updateUserByAdmin(UserUpdateRequest request) {
         User user = userRepository.findById(request.getId()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
-        userMapper.updateUser(user, request);
+//        userMapper.updateUser(user, request);
 
 
 

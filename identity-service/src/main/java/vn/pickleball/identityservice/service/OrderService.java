@@ -27,6 +27,7 @@ import vn.pickleball.identityservice.dto.response.*;
 import vn.pickleball.identityservice.entity.*;
 import vn.pickleball.identityservice.exception.ApiException;
 import vn.pickleball.identityservice.mapper.OrderMapper;
+import vn.pickleball.identityservice.mapper.OrderMapperCustom;
 import vn.pickleball.identityservice.mapper.TransactionMapper;
 import vn.pickleball.identityservice.repository.*;
 import vn.pickleball.identityservice.utils.GenerateString;
@@ -68,7 +69,7 @@ public class OrderService {
     private final EmailService emailService;
     private final OrderDetailService orderDetailService;
     private final BookingDateService bookingDateService;
-    private final OrderMapCustom orderMapCustom;
+    private final OrderMapperCustom orderMapperCustom;
 
     private static final String TRANSACTION_KEY_PREFIX = "transaction:";
     private static final String PREFIX = "bookingslot:";
@@ -153,7 +154,7 @@ public class OrderService {
         // Lên lịch kiểm tra sau 5 phút
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapCustom.toOrderResponse(savedOrder);
+        OrderResponse response = orderMapperCustom.toOrderResponse(savedOrder);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
@@ -251,7 +252,7 @@ public class OrderService {
             schedulePaymentCheck(billCode);
 
             Order finalOrder = orderRepository.save(savedOrder);
-            OrderResponse response = orderMapCustom.toOrderResponse(finalOrder);
+            OrderResponse response = orderMapperCustom.toOrderResponse(finalOrder);
             response.setQrcode(qrCodeResponse.getQrCode());
             redisTemplate.opsForValue().set(PREFIX_QR + finalOrder.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
 
@@ -292,7 +293,7 @@ public class OrderService {
                     throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
-            return orderMapCustom.toOrderResponse(finalOrder);
+            return orderMapperCustom.toOrderResponse(finalOrder);
         } else {
             savedOrder.setOrderStatus("Thay đổi lịch đặt thành công");
             Order finalOrder = orderRepository.save(savedOrder);
@@ -307,7 +308,7 @@ public class OrderService {
                     throw new ApiException("Not found scheduler for selected date booking","INVALID_BOOKING_DATE");
                 }
             }
-            return orderMapCustom.toOrderResponse(finalOrder);
+            return orderMapperCustom.toOrderResponse(finalOrder);
         }
     }
 
@@ -403,7 +404,7 @@ public class OrderService {
             if (order.getUser() != null && !order.getOrderType().equals("Đơn cố định")) {
                 String email = order.getUser().getEmail();
                 if (email != null) {
-                    emailService.sendBookingConfirmationEmail(email, orderMapCustom.toOrderResponse(order));
+                    emailService.sendBookingConfirmationEmail(email, orderMapperCustom.toOrderResponse(order));
                 }
             }
 
@@ -547,11 +548,11 @@ public class OrderService {
 
         orders = orderRepository.findByPhoneNumberOrUserId(value);
 
-        return orderMapCustom.toOrderResponses(orders);
+        return orderMapperCustom.toOrderResponses(orders);
     }
 
     public OrderResponse getOrderById(String oid) {
-        OrderResponse response = orderMapCustom.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
+        OrderResponse response = orderMapperCustom.toOrderResponse(orderRepository.findById(oid).orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND")));
         response.setQrcode(redisTemplate.opsForValue().get(PREFIX_QR + oid));
         return response;
     }
@@ -564,7 +565,19 @@ public class OrderService {
 //        }
 
         if(order.getOrderStatus().equals("Đã sử dụng lịch đặt")) throw new ApiException("Không thể hủy lịch vì đã sử dụng dịch vụ", "ORDER_INVALID");
+        if(order.getOrderType().equals("Đơn cố định")){
+            if (order.getPaymentStatus().equals("Chưa thanh toán")) {
+                order.setOrderStatus("Hủy đặt lịch");
+                orderRepository.save(order);
+                notificationService.sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
+                notificationService.sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
+                deleteTransactionRedis(order.getBillCode());
+                return orderMapperCustom.toOrderResponse(order);
+            }else {
+                throw new ApiException("Không thể hủy lịch cố định", "ORDER_INVALID");
+            }
 
+        }
         order.setOrderStatus("Hủy đặt lịch");
         order.setPaymentStatus(order.getPaymentStatus().equals("Chưa đặt cọc") ? "Chưa đặt cọc" : order.getPaymentStatus());
         if (order.getAmountPaid() != null && order.getAmountPaid().compareTo(order.getDepositAmount()) > 0) {
@@ -591,7 +604,7 @@ public class OrderService {
         notificationService.sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
         notificationService.sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
         deleteTransactionRedis(order.getBillCode());
-        return orderMapCustom.toOrderResponse(order);
+        return orderMapperCustom.toOrderResponse(order);
     }
 
     public void testFcm(String key) {
@@ -1027,7 +1040,7 @@ public class OrderService {
         saveTransactionToRedis(transaction);
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapCustom.toOrderResponse(order);
+        OrderResponse response = orderMapperCustom.toOrderResponse(order);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
@@ -1125,7 +1138,7 @@ public class OrderService {
                 pageable
         );
 
-        List<OrderData> orderData = orderMapCustom.toOrderDataList(orders.getContent());
+        List<OrderData> orderData = orderMapperCustom.toOrderDataList(orders.getContent());
 
         return OrderPage.builder()
                 .orders(orderData)
@@ -1151,7 +1164,7 @@ public class OrderService {
         order.setOrderStatus("Đã sử dụng lịch đặt");
         orderRepository.save(order);
 
-        return orderMapCustom.toOrderResponse(order);
+        return orderMapperCustom.toOrderResponse(order);
     }
 
     public void updateExpiredOrdersStatus() {
@@ -1269,7 +1282,7 @@ public class OrderService {
         saveTransactionToRedis(transaction);
         schedulePaymentCheck(billCode);
 
-        OrderResponse response = orderMapCustom.toOrderResponse(order);
+        OrderResponse response = orderMapperCustom.toOrderResponse(order);
         response.setQrcode(qrCodeResponse.getQrCode());
         redisTemplate.opsForValue().set(PREFIX_QR + order.getId(), qrCodeResponse.getQrCode(), 6, TimeUnit.MINUTES);
         return response;
