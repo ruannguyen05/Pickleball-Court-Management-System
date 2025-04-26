@@ -117,8 +117,8 @@ public class AuthenticationService {
         return AuthenticationResponse.builder().token(token).authenticated(true).build();
     }
 
-    private String generateToken(User user , boolean isRefreshToken) {
-        JWSHeader header = new JWSHeader(JWSAlgorithm.HS512);
+    public String generateToken(User user , boolean isRefreshToken) {
+        JWSHeader header = new JWSHeader(JWSAlgorithm.HS256);
 
         String uid = user.getId();
 

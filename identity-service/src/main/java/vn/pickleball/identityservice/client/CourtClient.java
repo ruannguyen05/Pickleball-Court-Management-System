@@ -43,7 +43,7 @@ public interface CourtClient {
     @GetMapping("/public/court_price/getByCourtId/{courtId}")
     CourtPriceResponse getCourtPriceByCourtId(@PathVariable("courtId") String courtId);
 
-    @PostMapping("/public/service/purchase-update")
+    @PostMapping("/public/service/purchase")
     ResponseEntity<Void> updateAfterPurchase(@RequestBody List<CourtServicePurchaseRequest> requests);
 
     @GetMapping("/public/court/ids")

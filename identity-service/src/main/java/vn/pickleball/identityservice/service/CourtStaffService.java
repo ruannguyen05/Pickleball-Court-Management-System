@@ -31,4 +31,12 @@ public class CourtStaffService {
                 .map(CourtStaff::getCourtId)
                 .collect(Collectors.toList());
     }
+
+    public void deleteByUserId(String uid){
+        courtStaffRepository.deleteByUserId(uid);
+    }
+
+    public void deleteByUserIdAndCourtIdsNotIn (String uid , List<String> courtIds){
+        courtStaffRepository.deleteByUserIdAndCourtIdsNotIn(uid, courtIds);
+    }
 }

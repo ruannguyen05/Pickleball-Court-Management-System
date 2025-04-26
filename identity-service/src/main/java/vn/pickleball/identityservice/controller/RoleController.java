@@ -1,5 +1,6 @@
 package vn.pickleball.identityservice.controller;
 
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -23,7 +24,7 @@ public class RoleController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    ApiResponse<RoleResponse> create(@RequestBody RoleRequest request) {
+    ApiResponse<RoleResponse> create(@RequestBody @Valid RoleRequest request) {
         return ApiResponse.<RoleResponse>builder()
                 .result(roleService.create(request))
                 .build();
@@ -31,7 +32,7 @@ public class RoleController {
 
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
-    ApiResponse<RoleResponse> update(@RequestBody RoleRequest request) {
+    ApiResponse<RoleResponse> update(@RequestBody @Valid RoleRequest request) {
         return ApiResponse.<RoleResponse>builder()
                 .result(roleService.updateRole(request))
                 .build();

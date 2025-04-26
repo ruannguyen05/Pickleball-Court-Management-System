@@ -16,7 +16,6 @@ public class OrderRequest {
     @NotBlank(message = "Customer name is required")
     private String customerName;
 
-    @NotBlank(message = "Phone number is required")
     @Pattern(regexp = "^[0-9]{10,11}$", message = "Phone number must be 10 or 11 digits")
     private String phoneNumber;
 
@@ -27,7 +26,6 @@ public class OrderRequest {
 
     private String discountCode;
 
-    @NotNull(message = "Total amount is required")
     @DecimalMin(value = "0.0", inclusive = false, message = "Total amount must be greater than zero")
     private BigDecimal totalAmount;
 
@@ -37,11 +35,9 @@ public class OrderRequest {
 
     private BigDecimal amountPaid;
 
-    @NotNull(message = "Deposit amount is required")
-    @DecimalMin(value = "0.0", message = "Deposit amount cannot be negative")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Deposit amount cannot be negative")
     private BigDecimal depositAmount;
 
-    @NotBlank(message = "Payment status is required")
     @Pattern(regexp = "^(Chưa đặt cọc|Chưa thanh toán|Đã thanh toán|Đã đặt cọc)$", message = "Payment status must be one of: Chưa đặt cọc || Chưa thanh toán||Đã thanh toán|Đã đặt cọc")
     private String paymentStatus;
 

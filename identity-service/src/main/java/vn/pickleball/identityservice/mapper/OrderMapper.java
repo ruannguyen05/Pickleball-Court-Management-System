@@ -287,6 +287,8 @@ public interface OrderMapper {
     @Mapping(target = "order", ignore = true)
     ServiceDetailEntity toServiceDetailEntity(ServiceDetailRequest request);
 
+    @Mapping(target = "id" , source = "courtServiceId")
+    @Mapping(target = "quantity" , source = "quantity")
     CourtServicePurchaseRequest toPurchaseRequest(ServiceDetailEntity entity);
 
     List<CourtServicePurchaseRequest> toPurchaseRequestList(List<ServiceDetailEntity> entities);

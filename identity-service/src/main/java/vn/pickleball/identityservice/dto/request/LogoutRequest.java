@@ -1,5 +1,6 @@
 package vn.pickleball.identityservice.dto.request;
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -9,5 +10,6 @@ import lombok.experimental.FieldDefaults;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class LogoutRequest {
+    @NotBlank(message = "Token is required")
     String token;
 }

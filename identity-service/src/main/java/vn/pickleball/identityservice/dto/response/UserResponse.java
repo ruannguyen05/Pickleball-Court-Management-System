@@ -24,9 +24,6 @@ public class UserResponse {
     String email;
 
     String phoneNumber;
-
-    UserRank userRank;
-
     Gender gender;
 
     private String avatar;

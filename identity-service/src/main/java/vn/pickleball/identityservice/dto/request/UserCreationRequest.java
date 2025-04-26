@@ -22,13 +22,13 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserCreationRequest implements Serializable {
     private static final long serialVersionUID = 1L;
-    @Size(min = 4, message = "USERNAME_INVALID")
+    @Size(min = 4, message = "Username must be at least 4 characters")
     String username;
 
-    @Size(min = 6, message = "INVALID_PASSWORD")
+
     @Pattern(
             regexp = "^(?=.*[A-Za-z])(?=.*\\d)[A-Za-z\\d!@#$%^&*()_+\\-={}\\[\\]:;\"'<>,.?/]{6,}$",
-            message = "INVALID_PASSWORD_FORMAT"
+            message = "Password must be at least 6 characters and is alphanumeric"
     )
     String password;
 
@@ -37,7 +37,7 @@ public class UserCreationRequest implements Serializable {
 
     @JsonProperty("dob")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
-    @DobConstraint(min = 10, message = "INVALID_DOB")
+    @DobConstraint(min = 10, message = "Minimum 10 years old")
     LocalDate dob;
 
 
@@ -46,7 +46,7 @@ public class UserCreationRequest implements Serializable {
     @Email(message = "Invalid email format")
     private String email;
 
-    @Pattern(regexp = "^(0[0-9]{9,10})$", message = "Phone number must start with 0 and be 10-11 digits long")
+    @Pattern(regexp = "^(0[0-9]{9,10})$", message = "Phone number must start with 0 and be 10-11 digits")
     private String phoneNumber;
 
     @JsonFormat(shape = JsonFormat.Shape.STRING)

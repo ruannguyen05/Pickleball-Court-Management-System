@@ -87,7 +87,7 @@ public interface OrderRepository extends JpaRepository<Order, String> , JpaSpeci
 
 
 
-    @Query("SELECT DISTINCT od.courtSlotId, bd.bookingDate FROM OrderDetail od " +
+    @Query("SELECT od.courtSlotId, bd.bookingDate FROM OrderDetail od " +
             "JOIN od.bookingDates bd " +
             "JOIN od.order o " +
             "WHERE o.courtId = :courtId " +

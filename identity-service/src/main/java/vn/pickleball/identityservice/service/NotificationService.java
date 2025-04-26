@@ -44,7 +44,7 @@ public class NotificationService {
 
         Notification notification = notificationMapper.toEntity(request);
         notification.setUser(user);
-        notification.setPhoneNumber(phoneNumber);
+        notification.setPhoneNumber(user != null ? user.getPhoneNumber() : phoneNumber);
         notification.setCreateAt(LocalDateTime.now());
         return notificationMapper.toDto(notificationRepository.save(notification));
     }

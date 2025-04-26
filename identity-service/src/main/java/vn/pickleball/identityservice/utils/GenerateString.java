@@ -44,6 +44,23 @@ public class GenerateString {
 
     }
 
+    public static String generateRandomPass(int length) {
+        if (length < 2) throw new IllegalArgumentException("Length must be at least 2");
+
+        StringBuilder sb = new StringBuilder(length);
+
+        // Bắt buộc thêm 1 chữ cái và 1 chữ số
+        sb.append(CHAR_UPPER.charAt(random.nextInt(CHAR_UPPER.length())));
+        sb.append(NUMBER.charAt(random.nextInt(NUMBER.length())));
+
+        // Thêm các ký tự còn lại
+        for (int i = 2; i < length; i++) {
+            sb.append(DATA_FOR_RANDOM_STRING.charAt(random.nextInt(DATA_FOR_RANDOM_STRING.length())));
+        }
+
+        return sb.toString();
+    }
+
 
     public static String encode(String totalAmount, String paymentAmount, String depositAmount, String bookingDate) {
         try {

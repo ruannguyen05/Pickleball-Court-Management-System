@@ -169,7 +169,7 @@ public class PublicController {
     }
 
     @PostMapping("/order/service") //*
-    public ResponseEntity<OrderResponse> orderService(@RequestBody OrderServiceRequest request){
+    public ResponseEntity<OrderResponse> orderService(@RequestBody @Valid OrderServiceRequest request){
         return ResponseEntity.ok(orderService.createServiceOrder(request));
     }
 

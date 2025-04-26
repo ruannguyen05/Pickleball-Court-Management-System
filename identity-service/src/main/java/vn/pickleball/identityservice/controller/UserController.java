@@ -88,7 +88,7 @@ public class UserController {
                 .build();
     }
     @PutMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
+    public ResponseEntity<?> changePassword(@RequestBody @Valid ChangePasswordRequest request) {
         userService.changePassword(request);
         return ResponseEntity.ok("Password changed successfully");
     }
@@ -104,14 +104,14 @@ public class UserController {
     }
 
     @PutMapping("/update")
-    ApiResponse<UserResponse> updateUser( @RequestBody UserUpdateRequest request) {
+    ApiResponse<UserResponse> updateUser( @RequestBody @Valid UserUpdateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUser(request))
                 .build();
     }
 
     @PutMapping("/admin_update")
-    ApiResponse<UserResponse> updateUserByAdmin( @RequestBody UserUpdateRequest request) {
+    ApiResponse<UserResponse> updateUserByAdmin( @RequestBody @Valid UserUpdateRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .result(userService.updateUserByAdmin(request))
                 .build();

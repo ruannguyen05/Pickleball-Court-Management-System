@@ -3,6 +3,7 @@ package vn.pickleball.identityservice.controller;
 
 import com.nimbusds.jose.JOSEException;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -28,7 +29,7 @@ public class AuthenticationController {
     UserService userService;
 
     @PostMapping("/token")
-    ApiResponse<AuthenticationResponse> authenticate(@RequestBody AuthenticationRequest request) {
+    ApiResponse<AuthenticationResponse> authenticate(@RequestBody @Valid AuthenticationRequest request) {
         var result = authenticationService.authenticate(request);
         return ApiResponse.<AuthenticationResponse>builder()
                 .message("Login successfully")
@@ -45,7 +46,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/refresh")
-    ApiResponse<AuthenticationResponse> authenticate(@RequestBody RefreshRequest request)
+    ApiResponse<AuthenticationResponse> authenticate(@RequestBody @Valid RefreshRequest request)
             throws ParseException, JOSEException {
         var result = authenticationService.refreshToken(request);
         return ApiResponse.<AuthenticationResponse>builder()
@@ -54,7 +55,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/logout")
-    ApiResponse<Void> logout(@RequestBody LogoutRequest request) throws ParseException, JOSEException {
+    ApiResponse<Void> logout(@RequestBody @Valid LogoutRequest request) throws ParseException, JOSEException {
         authenticationService.logout(request);
 
 
@@ -68,7 +69,7 @@ public class AuthenticationController {
     @GetMapping("/confirm_student")
     ApiResponse<UserResponse> confirmStudent(@RequestParam String key , HttpServletResponse response) {
         try {
-            response.sendRedirect("https://www.youtube.com/"); // Redirect sau khi xác nhận
+            response.sendRedirect("https://www.picklecourt.id.vn/"); // Redirect sau khi xác nhận
         } catch (IOException e) {
             throw new ApiException("Redirect failed", "SERVER_ERROR");
         }
@@ -78,7 +79,7 @@ public class AuthenticationController {
     }
 
     @PostMapping("/forgetPassword")
-    public void forgetPass(@RequestBody ForgotPasswordRequest request){
+    public void forgetPass(@RequestBody @Valid ForgotPasswordRequest request){
         userService.forgetPass(request.getKey());
     }
 

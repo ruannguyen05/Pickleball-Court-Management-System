@@ -1,5 +1,6 @@
 package vn.pickleball.identityservice.dto.request;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
@@ -18,12 +19,11 @@ public class OrderServiceRequest {
 
     private String userId;
 
-    @NotBlank
     private String orderStatus;
 
-    @NotBlank
     private String note;
 
+    @DecimalMin(value = "0.0", inclusive = false, message = "Total amount must be greater than zero")
     private BigDecimal paymentAmount;
 
 

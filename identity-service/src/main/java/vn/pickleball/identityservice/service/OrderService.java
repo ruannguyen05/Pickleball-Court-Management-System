@@ -177,7 +177,7 @@ public class OrderService {
 
         if (!order.getOrderStatus().equals("Đặt lịch thành công") &&
                 !order.getOrderStatus().equals("Đổi lịch thất bại")) {
-            throw new ApiException("Đơn chưa được tạo", "INVALID_ORDER");
+            throw new ApiException("Trạng thái đơn không hợp lệ", "INVALID_ORDER");
         }
         BigDecimal amountPaid = order.getAmountPaid();
         // Lấy danh sách booking cũ
@@ -226,6 +226,7 @@ public class OrderService {
             savedOrder.setPaymentStatus(savedOrder.getPaymentStatus() != null ? savedOrder.getPaymentStatus() : "Chưa đặt cọc");
             String billCode = "PM" + GenerateString.generateRandomString(13);
             savedOrder.setBillCode(billCode);
+            savedOrder.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
 
             CreateQrRequest qrRequest = CreateQrRequest.builder()
                     .billCode(billCode)
@@ -322,7 +323,7 @@ public class OrderService {
     /**
      * Xử lý đơn hàng quá hạn thanh toán
      */
-    private void processPaymentTimeout(String billCode) {
+    public void processPaymentTimeout(String billCode) {
         String key = TRANSACTION_KEY_PREFIX + billCode;
         if (!redisTemplate.hasKey(key)) {
             log.info("Payment received, no action needed for billCode: {}", billCode);
@@ -887,15 +888,30 @@ public class OrderService {
             LocalDate date = (LocalDate) booking[1];
             invalidCourtSlots.computeIfAbsent(courtSlotId, k -> new ArrayList<>()).add(date);
         }
+
+        List<CourtSlotMap> courtSlotMaps = courtClient.getCourtSlotMap(courtId).getBody();
+
+        Map<String, List<LocalDate>> invalidCourtSlotsByName = invalidCourtSlots.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> courtSlotMaps.stream()
+                                .filter(courtSlot -> courtSlot.getCourtSlotId().equals(entry.getKey()))
+                                .findFirst()
+                                .map(CourtSlotMap::getCourtSlotName)
+                                .orElse(entry.getKey()),
+                        Map.Entry::getValue
+                ));
+
         // Lấy danh sách CourtSlot khả dụng
         List<String> availableCourtSlots = courtClient.getCourtSlotIdsByCourtId(courtId).getBody()
                 .stream()
-                .filter(slotId -> !invalidCourtSlots.containsKey(slotId))
+                .filter(slotName -> !invalidCourtSlotsByName.containsKey(slotName))
                 .collect(Collectors.toList());
+
+
 
         // Trả về cả danh sách slot không hợp lệ & hợp lệ
         Map<String, Object> response = new HashMap<>();
-        response.put("invalidCourtSlots", invalidCourtSlots);
+        response.put("invalidCourtSlots", invalidCourtSlotsByName);
         response.put("availableCourtSlots", availableCourtSlots);
 
         return response;
@@ -1060,7 +1076,7 @@ public class OrderService {
                 .orElseThrow(() -> new ApiException("Not found Order", "ENTITY_NOT_FOUND"));
 
 
-        if (order.getAmountPaid().subtract(order.getTotalAmount()).compareTo(BigDecimal.ZERO) <= 0)
+        if (order.getAmountPaid().subtract(order.getTotalAmount()).compareTo(BigDecimal.ZERO) >= 0)
             throw new ApiException("payment amount of order invalid", "ORDER_INVALID");
 
         BigDecimal amount = order.getTotalAmount().subtract(order.getAmountPaid());

@@ -114,7 +114,7 @@ public class UserService {
         String email = user.getEmail();
 
         if(email==null) throw new ApiException("Account not have email", "NO_EMAIL");
-        String newPass = GenerateString.generateRandomString(6);
+        String newPass = GenerateString.generateRandomPass(8);
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
         user.setPassword(passwordEncoder.encode(newPass));
         userRepository.save(user);
@@ -190,8 +190,11 @@ public class UserService {
 
 //    @PostAuthorize("returnObject.username == authentication.name")
     public UserResponse updateUser(UserUpdateRequest request) {
-        User user = userRepository.findById(request.getId()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        var context = SecurityContextHolder.getContext();
+        String name = context.getAuthentication().getName();
 
+        User user = userRepository.findByUsername(name)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         userMapper.updateUser(user, request);
 
 //        var roles = roleRepository.findAllById(request.getRoles());
@@ -200,31 +203,45 @@ public class UserService {
         return userMapper.toUserResponse(userRepository.save(user));
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Transactional
     public UserResponse updateUserByAdmin(UserUpdateRequest request) {
-        User user = userRepository.findById(request.getId()).orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        log.info("Updating user with ID: {}, courtIds: {}", request.getId(), request.getCourtIds());
 
-//        userMapper.updateUser(user, request);
+        User user = userRepository.findById(request.getId())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
+        if (request.getRoles() == null || request.getRoles().isEmpty()) {
+            user.setRoles(roleService.getRole("USER"));
+        } else {
+            user.setRoles(new HashSet<>(roleService.getAllByIds(request.getRoles())));
+        }
 
-
-        var roles = roleService.getAllByIds(request.getRoles());
-        user.setRoles(new HashSet<>(roles));
         user.setActive(request.isActive());
-        if(request.getCourtIds() != null){
+
+        if (request.getCourtIds() != null) {
             validateCourtId(request.getCourtIds());
-            user.getCourtStaffs().clear();
-            for (String courtId : request.getCourtIds()) {
+
+            List<String> newCourtIds = request.getCourtIds();
+
+            courtStaffService.deleteByUserIdAndCourtIdsNotIn(request.getId(), newCourtIds);
+
+            Set<CourtStaff> newCourtStaffs = new HashSet<>();
+            for (String courtId : newCourtIds) {
                 CourtStaff courtStaff = CourtStaff.builder()
                         .id(new CourtStaffId(request.getId(), courtId))
                         .userId(request.getId())
                         .courtId(courtId)
                         .build();
-                user.getCourtStaffs().add(courtStaff);
+                newCourtStaffs.add(courtStaff);
             }
+
+            user.getCourtStaffs().clear();
+            user.getCourtStaffs().addAll(newCourtStaffs);
         }
 
-        return userMapper.toUserResponse(userRepository.save(user));
+        User savedUser = userRepository.save(user);
+        return userMapper.toUserResponse(savedUser);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -321,6 +338,7 @@ public class UserService {
     }
 
     public String updateAvatar(MultipartFile file){
+        if(!isValidImage(file)) throw new ApiException("File must be image", "INVALID_FILE");
         var context = SecurityContextHolder.getContext();
         String name = context.getAuthentication().getName();
 
@@ -433,5 +451,20 @@ public class UserService {
                 .filter(court -> isAdmin || courtIdsManage.contains(court.getId()))
                 .map(court -> new CourtManage(court.getId(), court.getName()))
                 .collect(Collectors.toList());
+    }
+
+    public boolean isValidImage(MultipartFile file) {
+        String contentType = file.getContentType();
+        String filename = file.getOriginalFilename();
+
+        if (contentType == null || filename == null) {
+            return false;
+        }
+
+        String lowerFilename = filename.toLowerCase();
+        boolean validExtension = lowerFilename.endsWith(".jpg") || lowerFilename.endsWith(".jpeg")
+                || lowerFilename.endsWith(".png") || lowerFilename.endsWith(".gif") || lowerFilename.endsWith(".bmp");
+
+        return contentType.startsWith("image/") && validExtension;
     }
 }
