@@ -179,6 +179,7 @@ public class CourtService {
     }
 
     public String uploadLogo(String courtId,MultipartFile file) throws IOException {
+        if(!isValidImage(file)) throw new ApiException("File must be image", "INVALID_FILE");
         Court court = courtRepository.findById(courtId).orElseThrow(() -> new RuntimeException("Court not found"));
 
         if (court.getLogoUrl() != null) {
@@ -192,6 +193,7 @@ public class CourtService {
     }
 
     public String uploadBackground(String courtId, MultipartFile file) throws IOException {
+        if(!isValidImage(file)) throw new ApiException("File must be image", "INVALID_FILE");
         Court court = courtRepository.findById(courtId).orElseThrow(() -> new RuntimeException("Court not found"));
 
         if (court.getBackgroundUrl() != null) {
@@ -202,5 +204,20 @@ public class CourtService {
         court.setBackgroundUrl(fileUrl);
         courtRepository.save(court);
         return fileUrl;
+    }
+
+    public boolean isValidImage(MultipartFile file) {
+        String contentType = file.getContentType();
+        String filename = file.getOriginalFilename();
+
+        if (contentType == null || filename == null) {
+            return false;
+        }
+
+        String lowerFilename = filename.toLowerCase();
+        boolean validExtension = lowerFilename.endsWith(".jpg") || lowerFilename.endsWith(".jpeg")
+                || lowerFilename.endsWith(".png") || lowerFilename.endsWith(".gif") || lowerFilename.endsWith(".bmp");
+
+        return contentType.startsWith("image/") && validExtension;
     }
 }

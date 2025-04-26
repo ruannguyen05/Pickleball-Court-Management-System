@@ -38,7 +38,7 @@ public class CourtPriceService {
 
     private final TimeSlotMapper timeSlotMapper;
 
-    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtPriceRequest.courtId)")
+//    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtPriceRequest.courtId)")
     public CourtPriceResponse createOrUpdateCourtPrice(CourtPriceRequest courtPriceRequest) {
         Court court = courtService.getCourtByCourtId(courtPriceRequest.getCourtId());
         if(courtPriceRequest.getWeekendTimeSlots()!= null) {
@@ -133,7 +133,8 @@ public class CourtPriceService {
 
         // Xóa các TimeSlot không còn tồn tại
         if (!existingTimeSlotMap.isEmpty()) {
-            timeSlotService.deleteAllTimeSlots((List<TimeSlot>) existingTimeSlotMap.values());
+            List<TimeSlot> timeSlotsToDelete = new ArrayList<>(existingTimeSlotMap.values());
+            timeSlotService.deleteAllTimeSlots(timeSlotsToDelete);
         }
 
         // Lưu các TimeSlot mới hoặc đã cập nhật

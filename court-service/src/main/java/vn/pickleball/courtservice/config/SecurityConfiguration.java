@@ -70,9 +70,9 @@ public class SecurityConfiguration {
 
     @Bean
     public JwtDecoder jwtDecoder() {
-        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(), "HS512");
+        SecretKeySpec secretKeySpec = new SecretKeySpec(secretKey.getBytes(), "HS256");
         return NimbusJwtDecoder.withSecretKey(secretKeySpec)
-                .macAlgorithm(MacAlgorithm.HS512)
+                .macAlgorithm(MacAlgorithm.HS256)
                 .build();
     }
 

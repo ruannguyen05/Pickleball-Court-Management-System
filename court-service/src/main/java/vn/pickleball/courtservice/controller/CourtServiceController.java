@@ -1,5 +1,6 @@
 package vn.pickleball.courtservice.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,13 +21,13 @@ public class CourtServiceController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
-    public ResponseEntity<CourtServiceResponse> create(@RequestBody CourtServiceRequest request) {
+    public ResponseEntity<CourtServiceResponse> create(@RequestBody @Valid CourtServiceRequest request) {
         return ResponseEntity.ok(courtServiceService.createCourtService(request));
     }
 
     @PutMapping("/update")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or hasRole('STAFF')")
-    public ResponseEntity<CourtServiceResponse> update(@RequestBody CourtServiceRequest request) {
+    public ResponseEntity<CourtServiceResponse> update(@RequestBody @Valid CourtServiceRequest request) {
         return ResponseEntity.ok(courtServiceService.updateCourtService(request));
     }
 
@@ -44,7 +45,6 @@ public class CourtServiceController {
     }
 
     @GetMapping("/manage/getServices")
-    @PreAuthorize("@authorizationService.hasAccessToCourt(#courtId)")
     public ResponseEntity<List<CourtServiceResponse>> getByCourtId(@RequestParam String  courtId) {
         return ResponseEntity.ok(courtServiceService.getAllCourtServicesByCourtId(courtId));
     }

@@ -1,5 +1,6 @@
 package vn.pickleball.courtservice.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,7 +23,7 @@ public class CourtController {
     private final CourtService courtService;
     // Create
     @PostMapping("/create_court")
-    public ResponseEntity<CourtResponse> createCourt(@RequestBody CourtRequest courtRequest) {
+    public ResponseEntity<CourtResponse> createCourt(@RequestBody @Valid CourtRequest courtRequest) {
         CourtResponse courtResponse = courtService.createCourt(courtRequest);
         return ResponseEntity.ok(courtResponse);
     }
@@ -68,7 +69,7 @@ public class CourtController {
 
     // Update
     @PutMapping("/update")
-    public ResponseEntity<CourtResponse> updateCourt(@RequestBody CourtRequest courtRequest) {
+    public ResponseEntity<CourtResponse> updateCourt(@RequestBody @Valid CourtRequest courtRequest) {
         CourtResponse updatedCourtResponse = courtService.updateCourt( courtRequest);
         if (updatedCourtResponse != null) {
             return ResponseEntity.ok(updatedCourtResponse);

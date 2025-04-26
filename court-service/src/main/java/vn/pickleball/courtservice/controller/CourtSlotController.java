@@ -1,5 +1,6 @@
 package vn.pickleball.courtservice.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,7 +23,7 @@ public class CourtSlotController {
 
 
     @PostMapping
-    public ResponseEntity<CourtSlotResponse> createCourtSlot(@RequestBody CourtSlotRequest courtSlotRequest) {
+    public ResponseEntity<CourtSlotResponse> createCourtSlot(@RequestBody @Valid CourtSlotRequest courtSlotRequest) {
         CourtSlotResponse courtSlotResponse = courtSlotService.createCourtSlot(courtSlotRequest);
         return ResponseEntity.ok(courtSlotResponse);
     }
@@ -40,7 +41,7 @@ public class CourtSlotController {
     }
 
     @PutMapping()
-    public ResponseEntity<CourtSlotResponse> updateCourtSlot(@RequestBody CourtSlotRequest courtSlotRequest) {
+    public ResponseEntity<CourtSlotResponse> updateCourtSlot(@RequestBody @Valid CourtSlotRequest courtSlotRequest) {
         CourtSlotResponse courtSlotResponse = courtSlotService.updateCourtSlot( courtSlotRequest);
         return ResponseEntity.ok(courtSlotResponse);
     }
@@ -76,7 +77,7 @@ public class CourtSlotController {
     }
 
     @PostMapping("/create-maintenance")
-    public ResponseEntity<String> addMaintenanceHistory(@RequestBody CourtMaintenanceHistoryRequestDTO dto) {
+    public ResponseEntity<String> addMaintenanceHistory(@RequestBody @Valid CourtMaintenanceHistoryRequestDTO dto) {
         maintenanceHistoryService.addMaintenanceHistory(dto);
         return ResponseEntity.ok("Create maintenance successfully");
     }
@@ -87,7 +88,7 @@ public class CourtSlotController {
     }
 
     @PutMapping("/update-maintenance")
-    public ResponseEntity<String> updateMaintenanceHistory(@RequestBody CourtMaintenanceHistoryRequestDTO dto) {
+    public ResponseEntity<String> updateMaintenanceHistory(@RequestBody @Valid CourtMaintenanceHistoryRequestDTO dto) {
         maintenanceHistoryService.updateMaintenanceHistory(dto);
         return ResponseEntity.ok("Update maintenance successfully");
     }

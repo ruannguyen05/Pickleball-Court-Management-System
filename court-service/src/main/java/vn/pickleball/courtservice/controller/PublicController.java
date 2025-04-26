@@ -1,5 +1,6 @@
 package vn.pickleball.courtservice.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -113,7 +114,7 @@ public class PublicController {
     }
 
     @PostMapping("/service/purchase")
-    public ResponseEntity<Void> purchaseUpdate(@RequestBody List<CourtServicePurchaseRequest> requests) {
+    public ResponseEntity<Void> purchaseUpdate(@RequestBody @Valid List<CourtServicePurchaseRequest> requests) {
         courtServiceService.updateAfterPurchase(requests);
         return ResponseEntity.ok().build();
     }

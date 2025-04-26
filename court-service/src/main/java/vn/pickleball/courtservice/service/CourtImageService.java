@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import vn.pickleball.courtservice.entity.Court;
 import vn.pickleball.courtservice.entity.CourtImage;
+import vn.pickleball.courtservice.exception.ApiException;
 import vn.pickleball.courtservice.repository.CourtImageRepository;
 import vn.pickleball.courtservice.repository.CourtRepository;
 
@@ -24,6 +25,7 @@ public class CourtImageService {
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public CourtImage uploadCourtImage(MultipartFile file, String courtId, boolean isMap) throws IOException {
+        if(!courtService.isValidImage(file)) throw new ApiException("File must be image", "INVALID_FILE");
         Court court = courtService.getCourtByCourtId(courtId);
 
         if (isMap) {
