@@ -244,7 +244,7 @@ public class UserService {
         return userMapper.toUserResponse(savedUser);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public UserResponse createUserByAdmin(UserCreationRequest request) {
         User user = userMapper.toUserEntity(request);
         PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(10);
@@ -275,7 +275,7 @@ public class UserService {
         return userMapper.toUserResponse(user);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public void deleteUser(String userId) {
         userRepository.deleteById(userId);
     }
@@ -329,7 +329,7 @@ public class UserService {
         return userRepository.findUsersWithRole(role != null ? role.toUpperCase() : null).stream().map(userMapper::toUserResponse).toList();
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public void updateUserStatus(String userId, boolean isActive) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException("User not found with id: " + userId, "USER_NOTFOUND"));

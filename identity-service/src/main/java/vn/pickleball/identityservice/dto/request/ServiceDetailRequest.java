@@ -11,7 +11,7 @@ public class ServiceDetailRequest {
     @NotBlank(message = "courtServiceId must be not null")
     private String courtServiceId;
 
-    @NotBlank(message = "quantity must be not null")
+    @NotNull(message = "quantity must be not null")
     private int quantity;
 
     @DecimalMin(value = "0.0", message = "Price amount cannot be negative")

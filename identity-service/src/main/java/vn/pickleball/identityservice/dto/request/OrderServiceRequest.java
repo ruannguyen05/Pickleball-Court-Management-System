@@ -23,7 +23,7 @@ public class OrderServiceRequest {
 
     private String note;
 
-    @DecimalMin(value = "0.0", inclusive = false, message = "Total amount must be greater than zero")
+    @DecimalMin(value = "0.0", inclusive = false, message = "Payment amount must be greater than zero")
     private BigDecimal paymentAmount;
 
 

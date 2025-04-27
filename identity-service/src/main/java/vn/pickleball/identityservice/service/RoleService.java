@@ -62,6 +62,10 @@ public class RoleService {
     }
 
     public void delete(String role) {
+
+        if(roleRepository.existsUserWithRoleName(role)){
+            throw new ApiException("Role is assign to user", "CANNOT_DELETE");
+        }
         roleRepository.deleteById(role);
     }
 

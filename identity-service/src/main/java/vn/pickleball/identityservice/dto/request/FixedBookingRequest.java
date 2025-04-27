@@ -16,15 +16,8 @@ public class FixedBookingRequest {
     @NotBlank(message = "Court ID is required")
     private String courtId;
 
-    @NotBlank(message = "Court name is required")
-    private String courtName;
-
-    @NotBlank(message = "Address is required")
-    private String address;
-
     private String userId;
 
-    @NotBlank(message = "Customer name is required")
     private String customerName;
 
     @NotBlank(message = "Phone number is required")

@@ -565,7 +565,7 @@ public class OrderService {
 //            throw  new ApiException("Order was timeout", "ORDER_TIMEOUT");
 //        }
 
-        if(order.getOrderStatus().equals("Đã sử dụng lịch đặt")) throw new ApiException("Không thể hủy lịch vì đã sử dụng dịch vụ", "ORDER_INVALID");
+        if(order.getOrderStatus().equals("Đã sử dụng lịch đặt") || order.getOrderStatus().equals("Đã hoàn thành")) throw new ApiException("Không thể hủy lịch vì đã sử dụng dịch vụ", "ORDER_INVALID");
         if(order.getOrderType().equals("Đơn cố định")){
             if (order.getPaymentStatus().equals("Chưa thanh toán")) {
                 order.setOrderStatus("Hủy đặt lịch");
@@ -948,6 +948,7 @@ public class OrderService {
         order.setPhoneNumber(request.getPhoneNumber());
         order.setCourtId(request.getCourtId());
         order.setOrderStatus("Đang xử lý");
+        order.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
         order.setOrderType(request.getOrderType() != null ? request.getOrderType() : "Đơn cố định");
         order.setPaymentStatus(request.getPaymentStatus() != null ? request.getPaymentStatus() : "Chưa thanh toán");
         order.setNote(request.getNote());
@@ -963,10 +964,16 @@ public class OrderService {
                 request.getStartDate(), request.getEndDate(), request.getSelectedDays()
         );
 
+        List<CourtSlotMap> courtSlotMaps = courtClient.getCourtSlotMap(request.getCourtId()).getBody();
+
         List<OrderDetail> allOrderDetails = new ArrayList<>();
 
         for (String courtSlotName : request.getSelectedCourtSlots()) {
-            String courtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), courtSlotName);
+            String courtSlotId = courtSlotMaps.stream()
+                    .filter(map -> map.getCourtSlotName().equals(courtSlotName))
+                    .map(CourtSlotMap::getCourtSlotId)
+                    .findFirst()
+                    .orElseThrow(() -> new ApiException("Not found courtSlotName", "INVALID_COURTSLOTNAME"));
 
             // Fixed dates
             List<LocalDate> fixedDates = bookingDates.stream()
@@ -998,7 +1005,11 @@ public class OrderService {
                 for (Map.Entry<String, String> entry : request.getFlexibleCourtSlotFixes().entrySet()) {
                     LocalDate conflictDate = LocalDate.parse(entry.getKey());
                     String fixedCourtSlotName = entry.getValue();
-                    String fixedCourtSlotId = courtClient.getCourtSlotIdByName(request.getCourtId(), fixedCourtSlotName);
+                    String fixedCourtSlotId = courtSlotMaps.stream()
+                            .filter(map -> map.getCourtSlotName().equals(fixedCourtSlotName))
+                            .map(CourtSlotMap::getCourtSlotId)
+                            .findFirst()
+                            .orElseThrow(() -> new ApiException("Not found courtSlotName", "INVALID_COURTSLOTNAME"));
 
                     OrderDetail flexibleDetail = new OrderDetail();
                     flexibleDetail.setOrder(order);
