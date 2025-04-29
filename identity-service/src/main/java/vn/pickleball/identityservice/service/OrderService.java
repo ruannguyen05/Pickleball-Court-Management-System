@@ -937,6 +937,10 @@ public class OrderService {
             currentDate = currentDate.plusDays(1);
         }
 
+        if (bookingDates.isEmpty()) {
+            throw new ApiException("Not found date booking in date range", "INVALID_DATE");
+        }
+
         return bookingDates;
     }
 

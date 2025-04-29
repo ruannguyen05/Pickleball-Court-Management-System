@@ -107,6 +107,8 @@ public class CourtService {
     @PreAuthorize("hasRole('ADMIN')")
     // Delete
     public void deleteCourt(String id) {
+        courtRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Court not found"));
         deleteBookingSlotsByCourtId(id);
         courtRepository.deleteById(id);
     }
@@ -119,6 +121,8 @@ public class CourtService {
             existingCourt.setActive(false);
             Court updatedCourt = courtRepository.save(existingCourt);
             deleteBookingSlotsByCourtId(updatedCourt.getId());
+        }else {
+            throw new RuntimeException("Court not found");
         }
     }
 
@@ -130,6 +134,8 @@ public class CourtService {
             existingCourt.setActive(true);
             Court updatedCourt = courtRepository.save(existingCourt);
             deleteBookingSlotsByCourtId(updatedCourt.getId());
+        }else {
+            throw new RuntimeException("Court not found");
         }
     }
 

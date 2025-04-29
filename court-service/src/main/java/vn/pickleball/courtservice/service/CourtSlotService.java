@@ -113,7 +113,7 @@ public class CourtSlotService {
     }
 
     public List<CourtSlotResponse> getAllCourtSlotsByCourtId(String courtId) {
-        List<CourtSlot> courtSlots = courtSlotRepository.findByCourtId(courtId);
+        List<CourtSlot> courtSlots = courtSlotRepository.findByCourtId(courtService.getCourtByCourtId(courtId).getId());
         return courtSlots.stream()
                 .map(courtSlotMapper::courtSlotToCourtSlotResponse)
                 .collect(Collectors.toList());

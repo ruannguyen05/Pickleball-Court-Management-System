@@ -133,7 +133,7 @@ public class PublicController {
             @RequestParam String courtId,
             @RequestParam String name) {
         CourtSlotResponse response = courtSlotService.getByName(courtId, name);
-        return response.getName();
+        return response.getId();
     }
 
     @PostMapping("/calculate-total-payment")

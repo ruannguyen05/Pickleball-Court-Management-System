@@ -51,7 +51,7 @@ public class CourtService_Service {
     }
 
     public List<CourtServiceResponse> getCourtServicesByCourtId(String courtId) {
-        return courtServiceRepository.findActiveByCourtId(courtId)
+        return courtServiceRepository.findActiveByCourtId(courtService.getCourtByCourtId(courtId).getId())
                 .stream()
                 .map(courtServiceMapper::toResponse)
                 .collect(Collectors.toList());
