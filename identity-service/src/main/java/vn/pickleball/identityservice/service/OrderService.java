@@ -112,7 +112,6 @@ public class OrderService {
         Double amount = request.getPaymentAmount().doubleValue();
         String billCode = "PM" + GenerateString.generateRandomString(13);
 
-        order.setBillCode(billCode);
         List<UpdateBookingSlot> updateBookingSlots = orderMapper.toUpdateBookingSlotList(request);
         // Tạo QR thanh toán
         CreateQrRequest qrRequest = CreateQrRequest.builder()
@@ -225,7 +224,6 @@ public class OrderService {
             savedOrder.setPaymentAmount(request.getPaymentAmount());
             savedOrder.setPaymentStatus(savedOrder.getPaymentStatus() != null ? savedOrder.getPaymentStatus() : "Chưa đặt cọc");
             String billCode = "PM" + GenerateString.generateRandomString(13);
-            savedOrder.setBillCode(billCode);
             savedOrder.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
 
             CreateQrRequest qrRequest = CreateQrRequest.builder()
@@ -572,7 +570,7 @@ public class OrderService {
                 orderRepository.save(order);
                 notificationService.sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
                 notificationService.sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
-                deleteTransactionRedis(order.getBillCode());
+//                deleteTransactionRedis(order.getBillCode());
                 return orderMapperCustom.toOrderResponse(order);
             }else {
                 throw new ApiException("Không thể hủy lịch cố định", "ORDER_INVALID");
@@ -604,7 +602,7 @@ public class OrderService {
         orderRepository.save(order);
         notificationService.sendNoti("HỦY LỊCH ĐẶT THÀNH CÔNG", "Lịch đặt của bạn đã được hủy.", order);
         notificationService.sendNotiManagerAndStaff("KHÁCH HÀNG ĐÃ HỦY LỊCH ĐẶT", "Kiểm tra lại lịch đặt và hoàn tiền nếu có", order);
-        deleteTransactionRedis(order.getBillCode());
+//        deleteTransactionRedis(order.getBillCode());
         return orderMapperCustom.toOrderResponse(order);
     }
 
@@ -1041,8 +1039,6 @@ public class OrderService {
                 .endTime(request.getEndTime())
                 .build()).multiply(BigDecimal.valueOf(request.getSelectedCourtSlots().size()));
         String billCode = "PM" + GenerateString.generateRandomString(13);
-
-        order.setBillCode(billCode);
         order.setPaymentAmount(amount);
         order.setTotalAmount(amount);
         order = orderRepository.save(order);
@@ -1284,7 +1280,6 @@ public class OrderService {
         order.setDepositAmount(BigDecimal.ZERO);
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setPaymentTimeout(LocalDateTime.now().plusMinutes(5));
-        order.setBillCode(billCode);
         orderRepository.save(order);
 
 

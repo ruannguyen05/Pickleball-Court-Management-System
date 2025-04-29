@@ -63,8 +63,6 @@ public class Order extends BaseEntity{
     @Column
     private LocalDateTime paymentTimeout;
 
-    private String billCode;
-
 //    private LocalDateTime settlementTime;
 
     @ManyToOne
